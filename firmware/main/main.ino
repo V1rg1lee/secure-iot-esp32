@@ -2,6 +2,7 @@
 #include "led.h"
 #include "sensor.h"
 #include "local_network.h"
+#include "mqtt_client.h"
 
 #define LED_PIN 32
 #define BTN_PIN 27
@@ -18,14 +19,26 @@ int lastStableButton   = LOW;
 unsigned long lastDht = 0;
 const unsigned long dhtEveryMs = 2000; // ms
 
-// Wifi credentials
+// Wifi config
 const char* ssid = "your_ssid";
 const char* password = "your_password";
+WiFiClient espClient;
+
+// MQTT client config
+const char* mqttServer = "ip_address_of_your_broker"; // ip address printed by the broker
+const int mqttPort = 8080;
+const char* mqttClientId = "esp32_client";
+const char* topic_pub = "iot/esp32/telemetry";
+const char* topic_sub = "iot/esp32/commands";
+PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(115200);
 
   setupWiFi(ssid, password);
+
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(messageReceived);
 
   pinMode(BTN_PIN, INPUT_PULLDOWN);
   setupLED(LED_PIN);
@@ -36,6 +49,10 @@ void setup() {
 }
 
 void loop() {
+  if (!client.connected()) {
+    reconnectMQTT(client, mqttClientId, topic_sub);
+  }
+
   int reading = digitalRead(BTN_PIN);
 
   if (reading != lastButtonReading) {
@@ -57,9 +74,11 @@ void loop() {
     lastDht = now;
     TH th = sensorRead();
     if (th.ok) {
-      Serial.print("DHT -> T: "); Serial.print(th.t, 1);
-      Serial.print(" °C | H: ");   Serial.print(th.h, 1);
-      Serial.println(" %");
+      char payload[64];
+      snprintf(payload, sizeof(payload), "{\"temperature\": %.1f, \"humidity\": %.1f}", th.t, th.h);
+      Serial.print("Publishing MQTT message: ");
+      Serial.println(payload);
+      client.publish(topic_pub, payload);
     } else {
       Serial.println("DHT -> invalid reading");
     }
