@@ -1,0 +1,14 @@
+[project]
+name = "secure-iot-broker"
+version = "0.1.0"
+requires-python = ">=3.10"
+description = "A pure-Python MQTT broker implementation."
+dependencies = [
+    "amqtt"
+]
+
+[project.scripts]
+secure-iot-broker = "secure_iot_broker.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["secure_iot_broker*"]
