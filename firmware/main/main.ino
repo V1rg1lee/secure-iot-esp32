@@ -1,19 +1,31 @@
+#include <Arduino.h>
 #include "led.h"
+#include "sensor.h"
 
 #define LED_PIN 32
 #define BTN_PIN 27
+#define DHT_PIN 26
 
+// Anti-rebond
 unsigned long lastDebounceTime = 0;
-const unsigned long debounceDelay = 30;
-
+const unsigned long debounceDelay = 30; // ms
 int lastButtonReading = LOW;
 int stableButtonState = LOW;
+int lastStableButton   = LOW;
+
+// Reading DHT11 periodically
+unsigned long lastDht = 0;
+const unsigned long dhtEveryMs = 2000; // ms
 
 void setup() {
   Serial.begin(115200);
-  
+
   pinMode(BTN_PIN, INPUT_PULLDOWN);
   setupLED(LED_PIN);
+
+  sensorInit(DHT_PIN);
+
+  Serial.println("Init OK (anti-rebond + DHT11 sur GPIO 26)");
 }
 
 void loop() {
@@ -26,8 +38,27 @@ void loop() {
   if ((millis() - lastDebounceTime) > debounceDelay) {
     stableButtonState = reading;
   }
-  
+
+  bool pressedEvent = (stableButtonState == HIGH && lastStableButton == LOW);
+  lastStableButton  = stableButtonState;
+  lastButtonReading = reading;
+
   setLED(stableButtonState == HIGH);
 
-  lastButtonReading = reading;
+  unsigned long now = millis();
+  if (now - lastDht >= dhtEveryMs) {
+    lastDht = now;
+    TH th = sensorRead();
+    if (th.ok) {
+      Serial.print("DHT -> T: "); Serial.print(th.t, 1);
+      Serial.print(" °C | H: ");   Serial.print(th.h, 1);
+      Serial.println(" %");
+    } else {
+      Serial.println("DHT -> invalid reading");
+    }
+  }
+
+  if (pressedEvent) {
+    Serial.println("Button pressed!");
+  }
 }
