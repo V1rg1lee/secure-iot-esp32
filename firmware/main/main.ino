@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "led.h"
 #include "sensor.h"
+#include "local_network.h"
 
 #define LED_PIN 32
 #define BTN_PIN 27
@@ -17,8 +18,14 @@ int lastStableButton   = LOW;
 unsigned long lastDht = 0;
 const unsigned long dhtEveryMs = 2000; // ms
 
+// Wifi credentials
+const char* ssid = "your_ssid";
+const char* password = "your_password";
+
 void setup() {
   Serial.begin(115200);
+
+  setupWiFi(ssid, password);
 
   pinMode(BTN_PIN, INPUT_PULLDOWN);
   setupLED(LED_PIN);
