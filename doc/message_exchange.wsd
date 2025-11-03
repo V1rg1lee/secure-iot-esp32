@@ -1,0 +1,38 @@
+@startuml
+participant "ESP32 Client" as Client
+participant "MQTT Server" as Server
+
+== Message exchange from ESP32 Client to MQTT Server ==
+
+note right of Client
+    Here we consider a message coming from the ESP32 client,
+    but the same principle applies to a message coming from
+    the MQTT server.
+end note
+
+note right of Client
+    At this point, the server and client share a symmetric
+    session key.
+end note
+
+Client -> Client: Generation of an IV (random or monotonic)
+Client -> Client: Encryption of the message with AES-GCM (symmetric key + IV)
+note right of Client
+    At the end of the payload, we add the MQTT topic.
+    Thus, the topic cannot be modified by a
+    man in the middle without the message being invalid.
+end note
+Client -> Server: Sending the MQTT message with the encrypted payload and the topic
+note right of Client
+    - iv (b64 encoded)
+    - ciphertext (b64 encoded)
+    - tag (b64 encoded)
+end note
+Server -> Server: Decryption with the session key
+Server -> Server: Verification of the GCM tag & integrity of the MQTT topic
+alt Decrypted message & valid tag & intact topic
+    Server-> Server: End of the procedure
+else Undecrypted message || invalid tag || altered topic
+    Server-> Server: Discard the message
+end
+@enduml
