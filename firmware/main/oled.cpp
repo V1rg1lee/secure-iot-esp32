@@ -74,16 +74,3 @@ void oledShowTempHum(float temp, float hum, bool ok) {
 
   display.display();
 }
-
-void oledShowButton(bool pressed) {
-  if (!ready) return;
-
-  // We don't clear everything: we just display at the bottom
-  display.fillRect(0, 48, SCREEN_WIDTH, 16, SSD1306_BLACK); // Clear bottom area
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 48);
-  display.print(F("Button: "));
-  display.println(pressed ? F("PRESSED") : F("released"));
-  display.display();
-}
