@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "led.h"
 #include "sensor.h"
+#include "oled.h"
 #include "local_network.h"
 #include "mqtt_client.h"
 
@@ -45,6 +46,14 @@ void setup() {
 
   sensorInit(DHT_PIN);
 
+   bool ok = oledInit();
+  if (!ok) {
+    Serial.println("OLED non detecte");
+  } else {
+    Serial.println("OLED initialise");
+    oledShowMessage("Boot...", "DHT + Button OK");
+  }
+
   Serial.println("Init OK (anti-rebond + DHT11 sur GPIO 26)");
 }
 
@@ -82,6 +91,8 @@ void loop() {
     } else {
       Serial.println("DHT -> invalid reading");
     }
+
+    oledShowTempHum(th.t, th.h, th.ok);
   }
 
   if (pressedEvent) {
