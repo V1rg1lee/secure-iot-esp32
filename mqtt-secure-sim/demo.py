@@ -30,7 +30,7 @@ def main():
     kms = KMS(mqtt_kms, kms_priv, kms_pub, kms_master_key, base_topic)
 
     # Provision a client
-    client_id = "client_1"
+    client_id = "esp32_client"
     client_master_key = hkdf(kms_master_key, info=client_id.encode(), length=32)
 
     client = Client(mqtt_client, client_id, client_master_key, kms_pub, base_topic)

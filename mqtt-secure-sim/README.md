@@ -46,7 +46,7 @@ uv venv --python 3.13
 Activate the uv environment and then install dependencies:
 
 ```bash
-uv install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ## 3. Launch mosquitto broker
@@ -64,3 +64,14 @@ In the uv environment, launch the demo script:
 ```bash
 uv run -m demo
 ```
+
+## 5. Launch for real
+
+### 1. Firewall
+
+If you are on linux, make sure port 1883 is open:
+
+```bash
+sudo ufw allow 1883
+```
+

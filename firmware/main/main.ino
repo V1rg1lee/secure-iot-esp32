@@ -4,6 +4,7 @@
 #include "oled.h"
 #include "local_network.h"
 #include "mqtt_client.h"
+#include "secure_mqtt.h" 
 
 #define LED_PIN 32
 #define BTN_PIN 27
@@ -24,14 +25,15 @@ const unsigned long dhtEveryMs = 2000; // ms
 const char* ssid = "your_ssid";
 const char* password = "your_password";
 WiFiClient espClient;
+PubSubClient client(espClient);
+const char* mqttClientId = "esp32_client";
+
 
 // MQTT client config
 const char* mqttServer = "ip_address_of_your_broker"; // ip address printed by the broker
-const int mqttPort = 8080;
-const char* mqttClientId = "esp32_client";
+const int mqttPort = 1883;
 const char* topic_pub = "iot/esp32/telemetry";
 const char* topic_sub = "iot/esp32/commands";
-PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(115200);
@@ -41,12 +43,15 @@ void setup() {
   client.setServer(mqttServer, mqttPort);
   client.setCallback(messageReceived);
 
+  // Secure MQTT: set the topic name
+  secureMqttSetTopic(topic_pub);
+
   pinMode(BTN_PIN, INPUT_PULLDOWN);
   setupLED(LED_PIN);
 
   sensorInit(DHT_PIN);
 
-   bool ok = oledInit();
+  bool ok = oledInit();
   if (!ok) {
     Serial.println("OLED non detecte");
   } else {
@@ -60,7 +65,12 @@ void setup() {
 void loop() {
   if (!client.connected()) {
     reconnectMQTT(client, mqttClientId, topic_sub);
+
+    // Once reconnected, start the secure handshake
+    secureMqttBeginHandshake(client, "iot/esp32", mqttClientId);
   }
+
+  client.loop(); // IMPORTANT to process MQTT messages
 
   int reading = digitalRead(BTN_PIN);
 
@@ -84,10 +94,19 @@ void loop() {
     TH th = sensorRead();
     if (th.ok) {
       char payload[64];
-      snprintf(payload, sizeof(payload), "{\"temperature\": %.1f, \"humidity\": %.1f}", th.t, th.h);
-      Serial.print("Publishing MQTT message: ");
-      Serial.println(payload);
-      client.publish(topic_pub, payload);
+      snprintf(payload, sizeof(payload),
+               "{\"temperature\": %.1f, \"humidity\": %.1f}", th.t, th.h);
+
+      if (secureMqttIsReady()) {
+        Serial.print("Publishing SECURE MQTT message: ");
+        Serial.println(payload);
+        secureMqttEncryptAndPublish(client,
+                                    topic_pub,
+                                    (const uint8_t*)payload,
+                                    strlen(payload));
+      } else {
+        Serial.println("TOPIC_key not ready, skipping secure publish");
+      }
     } else {
       Serial.println("DHT -> invalid reading");
     }

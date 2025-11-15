@@ -80,18 +80,18 @@ class KMS:
     def handle_auth(self, client_id: str, data: dict):
         challenge = bytes.fromhex(data["challenge"])
 
-    # response: challenge + signature + nonce_k
+        # response: echo challenge + nonce_k (signature omitted for simplicity on the ESP)
         nonce_k = os.urandom(32)
-        signature = sign(self.kms_privkey, challenge)
 
         response = {
             "challenge": challenge.hex(),
-            "signature": signature.hex(),
             "nonce_k": nonce_k.hex(),
         }
 
         resp_topic = f"{self.base_topic}/{client_id}/kms/clientauth"
-        self.mqtt.publish(resp_topic, json.dumps(response).encode())
+        payload = json.dumps(response, separators=(",", ":")).encode()
+        print(f"[KMS] Sending clientauth to {resp_topic}: {payload!r}")
+        self.mqtt.publish(resp_topic, payload)
 
     def handle_clientverify(self, client_id: str, data: dict):
         topic_name = data["topic"]
@@ -127,4 +127,6 @@ class KMS:
         }
 
         resp_topic = f"{self.base_topic}/{client_id}/kms/key"
-        self.mqtt.publish(resp_topic, json.dumps(response).encode())
+        payload = json.dumps(response, separators=(",", ":")).encode()
+        print(f"[KMS] Sending key to {resp_topic}: {payload!r}")
+        self.mqtt.publish(resp_topic, payload)
