@@ -75,3 +75,38 @@ If you are on linux, make sure port 1883 is open:
 sudo ufw allow 1883
 ```
 
+### 2. Launch mosquitto broker
+
+In another terminal, launch the Mosquitto broker:
+
+```bash
+sudo mosquitto -c /etc/mosquitto/mosquitto.conf -v
+```
+
+The content of /etc/mosquitto/mosquitto.conf should be:
+
+```
+pid_file /run/mosquitto/mosquitto.pid
+
+persistence true
+persistence_location /var/lib/mosquitto/
+
+log_dest stdout
+
+include_dir /etc/mosquitto/conf.d
+```
+
+and the folder /etc/mosquitto/conf.d should contain a file named `esp32.conf` with the content:
+
+```
+listener 1883 0.0.0.0
+allow_anonymous true
+```
+
+### 3. Launch the kms server
+
+In the uv environment, launch the kms server:
+
+```bash
+uv run -m kms_server
+```
