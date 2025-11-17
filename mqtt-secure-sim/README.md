@@ -54,32 +54,6 @@ uv pip install -r requirements.txt
 In another terminal, launch the Mosquitto broker:
 
 ```bash
-mosquitto -v
-```
-
-## 4. Launch the demo
-
-In the uv environment, launch the demo script:
-
-```bash
-uv run -m demo
-```
-
-## 5. Launch for real
-
-### 1. Firewall
-
-If you are on linux, make sure port 1883 is open:
-
-```bash
-sudo ufw allow 1883
-```
-
-### 2. Launch mosquitto broker
-
-In another terminal, launch the Mosquitto broker:
-
-```bash
 sudo mosquitto -c /etc/mosquitto/mosquitto.conf -v
 ```
 
@@ -103,7 +77,25 @@ listener 1883 0.0.0.0
 allow_anonymous true
 ```
 
-### 3. Launch the kms server
+## 4. Launch the demo
+
+In the uv environment, launch the demo script:
+
+```bash
+uv run -m demo
+```
+
+## 5. Launch for real
+
+### 5.1 Firewall
+
+If you are on linux, make sure port 1883 is open:
+
+```bash
+sudo ufw allow 1883
+```
+
+### 5.2 Launch the kms server
 
 In the uv environment, launch the kms server:
 
