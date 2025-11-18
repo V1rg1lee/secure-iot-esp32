@@ -15,7 +15,22 @@ BROKER_HOST = "localhost"
 BROKER_PORT = 1883
 ESP_CLIENT_ID = "esp32_client"
 
+def print_kms_pubkey_c_snippet(kms_pubkey):
+    pub_pem: bytes = kms_pubkey.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    pem_str = pub_pem.decode("ascii")
 
+    print("// Public key of the KMS in PEM format")
+    print("const char KMS_PUBKEY_PEM[] =")
+    for line in pem_str.splitlines():
+        # escape any quotes just in case
+        safe_line = line.replace("\\", "\\\\").replace("\"", "\\\"")
+        print(f"\"{safe_line}\\n\"")
+    print(";")
+    print()
+    
 def main():
     # 1) MQTT client for the KMS
     mqtt_kms = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
@@ -47,23 +62,7 @@ def main():
         print(f"  0x{b:02x}{end}")
     print("};")
     print()
-
-    # Ensure kms_pub is PEM bytes (serialize if it's a public key object)
-    if hasattr(kms_pub, "public_bytes"):
-        kms_pub_pem = kms_pub.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-    else:
-        kms_pub_pem = kms_pub
-
-    print("PUBLIC KEY of the KMS (PEM format) :")
-    # kms_pub_pem may be bytes or str — handle both
-    if isinstance(kms_pub_pem, bytes):
-        print(kms_pub_pem.decode())
-    else:
-        print(kms_pub_pem)
-    print()
+    print_kms_pubkey_c_snippet(kms_pub)
     print("⚠ Copy these values into secure_mqtt.cpp (CLIENT_MASTER_KEY and KMS_PUBKEY_PEM).")
 
     # 5) MQTT loop (blocking)

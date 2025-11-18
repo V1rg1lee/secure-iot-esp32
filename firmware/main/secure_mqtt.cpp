@@ -52,9 +52,10 @@ const uint8_t CLIENT_MASTER_KEY[32] = {
 };
 
 // TO BE REPLACED: KMS public key in PEM format for signature verification
-static const char KMS_PUBKEY_PEM[] = "-----BEGIN PUBLIC KEY-----
+const char KMS_PUBKEY_PEM[] = "-----BEGIN PUBLIC KEY-----
 EXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHERE
 -----END PUBLIC KEY-----"
+;
 
 // Hex helpers
 static void bytesToHex(const uint8_t* in, size_t len, char* out, size_t outSize) {

@@ -1,4 +1,5 @@
 #include "secure_crypto.h"
+#include "secure_mqtt.h"
 
 #include <string.h>
 #include <algorithm>
