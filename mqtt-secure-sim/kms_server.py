@@ -38,7 +38,7 @@ def main():
     print(f"Client ID   : {ESP_CLIENT_ID}")
     print()
     print("CLIENT_MASTER_KEY for the ESP32 (32 bytes) :")
-    print("uint8_t CLIENT_MASTER_KEY[32] = {")
+    print("const uint8_t CLIENT_MASTER_KEY[32] = {")
     for i, b in enumerate(client_master_key):
         end = "," if i < 31 else ""
         print(f"  0x{b:02x}{end}")
