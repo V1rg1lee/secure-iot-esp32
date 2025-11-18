@@ -32,3 +32,6 @@ bool sc_aes_gcm_decrypt(const uint8_t* key, size_t key_len,
                         const uint8_t* input, size_t in_len,
                         const uint8_t* tag, size_t tag_len,
                         uint8_t* output);
+
+bool sc_verify_kms_signature(const uint8_t* message, size_t message_len,
+                             const uint8_t* sig, size_t sig_len);

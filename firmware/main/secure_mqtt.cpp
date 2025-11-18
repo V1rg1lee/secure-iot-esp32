@@ -51,8 +51,10 @@ const uint8_t CLIENT_MASTER_KEY[32] = {
   0xbc
 };
 
-
-
+// TO BE REPLACED: KMS public key in PEM format for signature verification
+static const char KMS_PUBKEY_PEM[] = "-----BEGIN PUBLIC KEY-----
+EXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHERE
+-----END PUBLIC KEY-----"
 
 // Hex helpers
 static void bytesToHex(const uint8_t* in, size_t len, char* out, size_t outSize) {
@@ -175,9 +177,14 @@ static void handleClientAuth(const char* json,
 
   char challHex[32*2+1];
   char nonceHex[32*2+1];
+  char sigHex[1024];
 
   if (!extractJsonStringField(json, "challenge", challHex, sizeof(challHex))) {
     Serial.println("[SEC] challenge missing in clientauth");
+    return;
+  }
+  if (!extractJsonStringField(json, "signature", sigHex, sizeof(sigHex))) {
+    Serial.println("[SEC] signature missing in clientauth");
     return;
   }
   if (!extractJsonStringField(json, "nonce_k", nonceHex, sizeof(nonceHex))) {
@@ -192,8 +199,18 @@ static void handleClientAuth(const char* json,
     return;
   }
 
-  // TODO: extract "signature" and verify RSA with the KMS public key.
-  Serial.println("[SEC] KMS authenticated (signature NOT YET VERIFIED!).");
+  // Verify the signature
+  uint8_t sig[256]; // for RSA-2048
+  size_t sigLen = hexToBytes(sigHex, sig, sizeof(sig));
+
+  // V
+  if (!sc_verify_kms_signature(g_lastChallenge, sizeof(g_lastChallenge),
+                               sig, sigLen)) {
+    Serial.println("[SEC] KMS signature invalid, aborting");
+    return;
+  }
+
+  Serial.println("[SEC] KMS authenticated (signature OK).");
 
   uint8_t nonceK[32];
   hexToBytes(nonceHex, nonceK, sizeof(nonceK));
@@ -303,7 +320,7 @@ bool secureMqttHandleKmsMessage(const char* topic,
 
   const char* action = topic + prefixLen; // "clientauth" or "key"
   // payload -> JSON string
-  static char jsonBuf[1024];
+  static char jsonBuf[1400];
   size_t copyLen = (length < sizeof(jsonBuf)-1) ? length : (sizeof(jsonBuf)-1);
   memcpy(jsonBuf, payload, copyLen);
   jsonBuf[copyLen] = '\0';

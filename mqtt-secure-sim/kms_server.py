@@ -5,6 +5,9 @@ import paho.mqtt.client as mqtt
 from crypto_utils import generate_kms_keys, hkdf
 from kms import KMS
 
+# new import to serialize public key objects to PEM
+from cryptography.hazmat.primitives import serialization
+
 
 # ==== COMMON CONFIG WITH THE ESP32 ====
 BASE_TOPIC = "iot/esp32"
@@ -44,7 +47,24 @@ def main():
         print(f"  0x{b:02x}{end}")
     print("};")
     print()
-    print("⚠ Copy these values into secure_mqtt.cpp (CLIENT_MASTER_KEY).")
+
+    # Ensure kms_pub is PEM bytes (serialize if it's a public key object)
+    if hasattr(kms_pub, "public_bytes"):
+        kms_pub_pem = kms_pub.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    else:
+        kms_pub_pem = kms_pub
+
+    print("PUBLIC KEY of the KMS (PEM format) :")
+    # kms_pub_pem may be bytes or str — handle both
+    if isinstance(kms_pub_pem, bytes):
+        print(kms_pub_pem.decode())
+    else:
+        print(kms_pub_pem)
+    print()
+    print("⚠ Copy these values into secure_mqtt.cpp (CLIENT_MASTER_KEY and KMS_PUBKEY_PEM).")
 
     # 5) MQTT loop (blocking)
     mqtt_kms.loop_forever()

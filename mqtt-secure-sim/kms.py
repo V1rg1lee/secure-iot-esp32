@@ -80,11 +80,13 @@ class KMS:
     def handle_auth(self, client_id: str, data: dict):
         challenge = bytes.fromhex(data["challenge"])
 
-        # response: echo challenge + nonce_k (signature omitted for simplicity on the ESP)
+        # challenge + signature + nonce_k
         nonce_k = os.urandom(32)
+        signature = sign(self.kms_privkey, challenge)
 
         response = {
             "challenge": challenge.hex(),
+            "signature": signature.hex(),
             "nonce_k": nonce_k.hex(),
         }
 
