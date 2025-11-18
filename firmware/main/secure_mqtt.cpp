@@ -9,7 +9,7 @@
 
 static char g_topicName[64] = {0};
 static uint8_t g_topicKey[32];
-static bool g_topicKeyReady = false;
+static bool g_topicKeyReady = true;
 static uint32_t g_counter = 0;
 
 static uint8_t g_lastChallenge[32];
@@ -17,39 +17,41 @@ static bool g_haveChallenge = false;
 
 // TO BE REPLACED: given by the KMS after launch 
 const uint8_t CLIENT_MASTER_KEY[32] = {
-  0x15,
-  0x13,
-  0x3a,
-  0x90,
-  0x5e,
-  0x6d,
-  0x8a,
-  0x21,
-  0xb8,
-  0xb7,
-  0x14,
-  0xdd,
-  0xae,
-  0x94,
-  0xb0,
-  0x87,
-  0x57,
-  0x3b,
-  0xf5,
-  0xf6,
-  0x4f,
-  0x98,
-  0x12,
-  0x99,
-  0x1e,
-  0xf1,
-  0xca,
-  0x42,
-  0x01,
+  0x2a,
+  0x2d,
+  0x8b,
+  0x81,
+  0xb2,
+  0xe6,
+  0xfb,
+  0x4b,
+  0x73,
+  0x37,
+  0x7c,
+  0x75,
   0x91,
-  0x5c,
-  0x44
+  0xd6,
+  0x40,
+  0x0d,
+  0xcc,
+  0x21,
+  0x5a,
+  0x65,
+  0xf6,
+  0x0d,
+  0x26,
+  0x37,
+  0xa9,
+  0x23,
+  0x9b,
+  0x51,
+  0x1f,
+  0x94,
+  0xb4,
+  0xbc
 };
+
+
 
 
 // Hex helpers
@@ -288,11 +290,13 @@ bool secureMqttHandleKmsMessage(const char* topic,
                                 const char* baseTopic,
                                 const char* clientId,
                                 PubSubClient& client) {
+
   // Expecting: baseTopic/clientId/kms/xxx
   char prefix[128];
   snprintf(prefix, sizeof(prefix), "%s/%s/kms/", baseTopic, clientId);
   size_t prefixLen = strlen(prefix);
 
+  // Check if prefix matches
   if (strncmp(topic, prefix, prefixLen) != 0) {
     return false; // not for us
   }
@@ -303,13 +307,19 @@ bool secureMqttHandleKmsMessage(const char* topic,
   size_t copyLen = (length < sizeof(jsonBuf)-1) ? length : (sizeof(jsonBuf)-1);
   memcpy(jsonBuf, payload, copyLen);
   jsonBuf[copyLen] = '\0';
+  Serial.print("[SEC] KMS action=");
+  Serial.print(action);
+  Serial.print(" payload=");
+  Serial.println(jsonBuf);
 
   if (strcmp(action, "clientauth") == 0) {
+    Serial.println("[SEC] Handling clientauth");
     handleClientAuth(jsonBuf, baseTopic, clientId, client);
   } else if (strcmp(action, "key") == 0) {
+    Serial.println("[SEC] Handling key");
     handleKeyMessage(jsonBuf);
   } else {
-    // other KMS message
+    Serial.println("[SEC] Unknown KMS action, ignoring");
   }
 
   return true;
@@ -384,4 +394,109 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
   g_counter++;
 
   return client.publish(appTopic, payload);
+}
+
+bool secureMqttDecryptPayload(const uint8_t* payload,
+                              unsigned int length,
+                              const char* expectedTopic,
+                              char* outBuffer,
+                              size_t outBufferSize) {
+  if (!g_topicKeyReady) {
+    Serial.println("[SEC] Cannot decrypt, TOPIC_key not ready");
+    return false;
+  }
+
+  if (!payload || length == 0 || !expectedTopic || !outBuffer || outBufferSize == 0) {
+    Serial.println("[SEC] Cannot decrypt, invalid parameters");
+    return false;
+  }
+
+  // Copy payload to a temporary, null-terminated buffer
+  static char jsonBuf[1024];
+  size_t copyLen = (length < sizeof(jsonBuf)-1) ? length : (sizeof(jsonBuf)-1);
+  memcpy(jsonBuf, payload, copyLen);
+  jsonBuf[copyLen] = '\0';
+
+  char ivHex[12*2+1];
+  char ctHex[256*2+1];
+  char tagHex[16*2+1];
+  char topicNameBuf[64];
+  int counter = 0;
+
+  if (!extractJsonStringField(jsonBuf, "iv", ivHex, sizeof(ivHex))) {
+    Serial.println("[SEC] Decrypt: iv missing");
+    return false;
+  }
+  if (!extractJsonIntField(jsonBuf, "counter", &counter)) {
+    Serial.println("[SEC] Decrypt: counter missing");
+    return false;
+  }
+  if (!extractJsonStringField(jsonBuf, "ciphertext", ctHex, sizeof(ctHex))) {
+    Serial.println("[SEC] Decrypt: ciphertext missing");
+    return false;
+  }
+  if (!extractJsonStringField(jsonBuf, "tag", tagHex, sizeof(tagHex))) {
+    Serial.println("[SEC] Decrypt: tag missing");
+    return false;
+  }
+  if (!extractJsonStringField(jsonBuf, "topic_name", topicNameBuf, sizeof(topicNameBuf))) {
+    Serial.println("[SEC] Decrypt: topic_name missing");
+    return false;
+  }
+
+  if (strcmp(topicNameBuf, expectedTopic) != 0) {
+    Serial.print("[SEC] Decrypt: topic_name mismatch (payload=");
+    Serial.print(topicNameBuf);
+    Serial.print(", expected=");
+    Serial.print(expectedTopic);
+    Serial.println(")");
+    return false;
+  }
+
+  uint8_t iv[12];
+  uint8_t ciphertext[256];
+  uint8_t tag[16];
+  size_t ivLen = hexToBytes(ivHex, iv, sizeof(iv));
+  size_t ctLen = hexToBytes(ctHex, ciphertext, sizeof(ciphertext));
+  hexToBytes(tagHex, tag, sizeof(tag));
+
+  uint8_t counterBytes[4];
+  counterBytes[0] = (counter >> 24) & 0xFF;
+  counterBytes[1] = (counter >> 16) & 0xFF;
+  counterBytes[2] = (counter >> 8)  & 0xFF;
+  counterBytes[3] = (counter)       & 0xFF;
+
+  uint8_t aad[4 + 64];
+  size_t aadLen = 4 + strlen(topicNameBuf);
+  memcpy(aad, counterBytes, 4);
+  memcpy(aad+4, topicNameBuf, strlen(topicNameBuf));
+
+  uint8_t salt[12+4];
+  memcpy(salt, iv, 12);
+  memcpy(salt+12, counterBytes, 4);
+
+  uint8_t aesKey[32];
+  sc_hkdf_sha256(g_topicKey, sizeof(g_topicKey),
+                 salt, sizeof(salt),
+                 (const uint8_t*)topicNameBuf, strlen(topicNameBuf),
+                 aesKey, sizeof(aesKey));
+
+  if (ctLen >= outBufferSize) {
+    Serial.println("[SEC] Decrypt: ciphertext too large for buffer");
+    return false;
+  }
+
+  bool ok = sc_aes_gcm_decrypt(aesKey, sizeof(aesKey),
+                               iv, ivLen,
+                               aad, aadLen,
+                               ciphertext, ctLen,
+                               tag, sizeof(tag),
+                               (uint8_t*)outBuffer);
+  if (!ok) {
+    Serial.println("[SEC] AES-GCM decrypt failed");
+    return false;
+  }
+
+  outBuffer[ctLen] = '\0';
+  return true;
 }

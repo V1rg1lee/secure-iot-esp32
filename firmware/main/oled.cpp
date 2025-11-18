@@ -74,3 +74,29 @@ void oledShowTempHum(float temp, float hum, bool ok) {
 
   display.display();
 }
+
+void oledShowTempHumText(const char* tempStr, const char* humStr, bool ok) {
+  if (!ready) return;
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println(F("Capteur DHT11"));
+
+  display.setCursor(0, 16);
+  if (ok) {
+    display.print(F("Temp: "));
+    display.print(tempStr);
+    display.println(F(" C"));
+
+    display.print(F("Hum : "));
+    display.print(humStr);
+    display.println(F(" %"));
+  } else {
+    display.println(F("Lecture invalide"));
+  }
+
+  display.display();
+}

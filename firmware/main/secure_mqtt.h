@@ -31,3 +31,11 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
                                  const char* appTopic,
                                  const uint8_t* plaintext,
                                  size_t plaintextLen);
+
+// Decrypts an incoming secure payload for the expected topic into outBuffer.
+// Returns true on success.
+bool secureMqttDecryptPayload(const uint8_t* payload,
+                              unsigned int length,
+                              const char* expectedTopic,
+                              char* outBuffer,
+                              size_t outBufferSize);
