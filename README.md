@@ -114,7 +114,7 @@ In the uv environment, launch the kms server in the `kms` folder:
 uv run -m kms_server
 ```
 
-### 6. Flash the ESP32 firmware
+## 6. Flash the ESP32 firmware
 
 With the Arduino IDE, flash the firmware located in the `firmware` folder to each ESP32.
 
