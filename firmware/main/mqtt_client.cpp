@@ -83,21 +83,19 @@ void messageReceived(char* topic, byte* payload, unsigned int length) {
 }
 
 extern PubSubClient client;
+extern void handleResetButton();
 
 void reconnectMQTT(PubSubClient& client,
                    const char* clientId,
                    const char* commandTopicSub,
                    const char* dataTopicSub) {
-  // Loop until we're reconnected
   while (!client.connected()) {
-    if (client.connect(clientId)) {
+    handleResetButton();
 
-      // 1) Subscribe to the commands topic as before
+    if (client.connect(clientId)) {
       client.subscribe(commandTopicSub);
-      // 2) Subscribe to the peer data topic
       client.subscribe(dataTopicSub);
 
-      // 2) Subscribe to the KMS topics for this client
       char kmsTopic[128];
       snprintf(kmsTopic, sizeof(kmsTopic),
                "iot/esp32/%s/kms/#", clientId);
@@ -108,7 +106,12 @@ void reconnectMQTT(PubSubClient& client,
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
-      delay(5000);
+
+      unsigned long start = millis();
+      while (millis() - start < 5000) {
+        handleResetButton();
+        delay(100);
+      }
     }
   }
 }

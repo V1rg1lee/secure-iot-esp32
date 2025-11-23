@@ -19,7 +19,14 @@ class KMS:
     We assume mqtt_client is a connected paho.mqtt.client.Client.
     """
 
-    def __init__(self, mqtt_client, kms_privkey, kms_pubkey, kms_master_key: bytes, base_topic: str):
+    def __init__(
+        self,
+        mqtt_client,
+        kms_privkey,
+        kms_pubkey,
+        kms_master_key: bytes,
+        base_topic: str,
+    ):
         self.mqtt = mqtt_client
         self.kms_privkey = kms_privkey
         self.kms_pubkey = kms_pubkey
@@ -29,8 +36,8 @@ class KMS:
         # (client_id, topic) -> TOPIC_key (AES-256)
         self.topic_keys: Dict[str, bytes] = {}
 
-    # The KMS should listen to all topics: base_topic/CLIENT_ID/kms/...
-    # Example: iot/esp32/client_1/kms/auth
+        # The KMS should listen to all topics: base_topic/CLIENT_ID/kms/...
+        # Example: iot/esp32/client_1/kms/auth
         self.mqtt.on_message = self._on_message
         self.mqtt.subscribe(f"{self.base_topic}/+/kms/#")
 
@@ -57,9 +64,9 @@ class KMS:
         if not topic.startswith(prefix):
             return
 
-    # full topic: base_topic/CLIENT_ID/kms/action
-    # example: iot/esp32/client_1/kms/auth
-        relative = topic[len(prefix):]  # "client_1/kms/auth"
+        # full topic: base_topic/CLIENT_ID/kms/action
+        # example: iot/esp32/client_1/kms/auth
+        relative = topic[len(prefix) :]  # "client_1/kms/auth"
         parts = relative.split("/")
         if len(parts) < 3:
             return
@@ -100,9 +107,11 @@ class KMS:
         hmac_received = bytes.fromhex(data["hmac"])
         nonce_k = bytes.fromhex(data["nonce_k"])
 
-    # derive the same keys as the client
+        # derive the same keys as the client
         client_master_key = self.derive_client_master_key(client_id)
-        topic_auth_key, topic_key_enc_key = self.derive_topic_keys_material(client_master_key, topic_name)
+        topic_auth_key, topic_key_enc_key = self.derive_topic_keys_material(
+            client_master_key, topic_name
+        )
 
         expected_hmac = hmac_sha256(topic_auth_key, nonce_k)
         if not hmac.compare_digest(hmac_received, expected_hmac):
@@ -119,7 +128,9 @@ class KMS:
 
         # Wrap TOPIC_key with AES-GCM under TOPIC_key_enc_key
         iv = os.urandom(12)
-        ciphertext, tag = aes_gcm_encrypt(topic_key_enc_key, iv, topic_key, aad=b"KMS_TOPIC_KEY")
+        ciphertext, tag = aes_gcm_encrypt(
+            topic_key_enc_key, iv, topic_key, aad=b"KMS_TOPIC_KEY"
+        )
 
         response = {
             "topic": topic_name,

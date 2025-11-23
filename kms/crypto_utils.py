@@ -41,6 +41,7 @@ def sign(privkey, data: bytes) -> bytes:
 
 def verify(pubkey, signature: bytes, data: bytes) -> bool:
     from cryptography.exceptions import InvalidSignature
+
     try:
         pubkey.verify(
             signature,
@@ -60,7 +61,9 @@ def hmac_sha256(key: bytes, data: bytes) -> bytes:
     return hmac.new(key, data, hashlib.sha256).digest()
 
 
-def aes_gcm_encrypt(key: bytes, iv: bytes, plaintext: bytes, aad: bytes = b"") -> Tuple[bytes, bytes]:
+def aes_gcm_encrypt(
+    key: bytes, iv: bytes, plaintext: bytes, aad: bytes = b""
+) -> Tuple[bytes, bytes]:
     aesgcm = AESGCM(key)
     ct_and_tag = aesgcm.encrypt(iv, plaintext, aad)
     # AESGCM returns ciphertext || tag
@@ -68,6 +71,8 @@ def aes_gcm_encrypt(key: bytes, iv: bytes, plaintext: bytes, aad: bytes = b"") -
     return ciphertext, tag
 
 
-def aes_gcm_decrypt(key: bytes, iv: bytes, ciphertext: bytes, tag: bytes, aad: bytes = b"") -> bytes:
+def aes_gcm_decrypt(
+    key: bytes, iv: bytes, ciphertext: bytes, tag: bytes, aad: bytes = b""
+) -> bytes:
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(iv, ciphertext + tag, aad)

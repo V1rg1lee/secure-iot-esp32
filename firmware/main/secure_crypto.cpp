@@ -103,11 +103,14 @@ bool sc_aes_gcm_decrypt(const uint8_t* key, size_t key_len,
 
 bool sc_verify_kms_signature(const uint8_t* message, size_t message_len,
                              const uint8_t* sig, size_t sig_len) {
+  if (KMS_PUBKEY_PEM[0] == '\0') {
+    return false;
+  }
   int ret;
   mbedtls_pk_context pk;
   mbedtls_pk_init(&pk);
 
-  // Charger la clé publique PEM
+  // Load the PEM public key
   ret = mbedtls_pk_parse_public_key(&pk,
                                     (const unsigned char*)KMS_PUBKEY_PEM,
                                     strlen(KMS_PUBKEY_PEM) + 1);
@@ -116,7 +119,7 @@ bool sc_verify_kms_signature(const uint8_t* message, size_t message_len,
     return false;
   }
 
-  // Calculer SHA-256(message)
+  // Compute SHA-256(message)
   unsigned char hash[32];
   const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   if (!md_info) {
@@ -129,7 +132,7 @@ bool sc_verify_kms_signature(const uint8_t* message, size_t message_len,
     return false;
   }
 
-  // Vérifier la signature
+  // Verify the signature
   ret = mbedtls_pk_verify(&pk,
                           MBEDTLS_MD_SHA256,
                           hash, sizeof(hash),

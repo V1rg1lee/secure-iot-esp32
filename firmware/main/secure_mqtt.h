@@ -4,10 +4,12 @@
 #include <PubSubClient.h>
 
 // TO ADJUST: 32-byte CLIENT_MASTER_KEY provisioned (copied from your Python simulation)
-extern const uint8_t CLIENT_MASTER_KEY[32];
+extern uint8_t CLIENT_MASTER_KEY[32];
 
 // TO ADJUST: KMS public key in PEM format for signature verification
-extern const char KMS_PUBKEY_PEM[];
+extern char KMS_PUBKEY_PEM[];
+
+void secureMqttSetKmsPubkey(const char* pem);
 
 // Full name of the secure topic (e.g., "iot/esp32/telemetry")
 void secureMqttSetTopic(const char* topic_name);

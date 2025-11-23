@@ -16,53 +16,21 @@ static uint8_t g_lastChallenge[32];
 static bool g_haveChallenge = false;
 
 // TO BE REPLACED: given by the KMS after launch 
-const uint8_t CLIENT_MASTER_KEY[32] = {
-  0xda,
-  0xe9,
-  0x98,
-  0xd9,
-  0x46,
-  0x3a,
-  0xea,
-  0x14,
-  0xeb,
-  0xea,
-  0x26,
-  0x30,
-  0x47,
-  0xb9,
-  0x04,
-  0xdd,
-  0x9a,
-  0x63,
-  0xa0,
-  0x4e,
-  0x98,
-  0xf8,
-  0x85,
-  0x1c,
-  0xca,
-  0x6c,
-  0xa6,
-  0x21,
-  0x2e,
-  0xaa,
-  0x95,
-  0x95
-};
+uint8_t CLIENT_MASTER_KEY[32] = {0};
 
 // TO BE REPLACED: KMS public key in PEM format for signature verification
-const char KMS_PUBKEY_PEM[] =
-"-----BEGIN PUBLIC KEY-----\n"
-"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjKNz+6X84leMhmvil33d\n"
-"xXI8RF1zDYJoL9l8DanZf0uNdHXt3Wyich26XYDOrEtkb9YZ5nUV8LrNfBMJ45nK\n"
-"G2fOFpmDBCEmLQGwwKNJejrdG+tR+2C/c31Wr0nxwwAPZsiU/MFRYBIGO2vqMXxv\n"
-"cixrvNTb6M0iu+sDEkV2ppg52CPj9DZu05muBkuI4uZal4uEXgLgrc7OfSHW70ts\n"
-"2PecXKkDQG2WB233JT7vTi3GY+DkTxoX8ICzENz6UWOUcsStFuaz3iG5q/58LKYP\n"
-"kLyRi/XkZnK3WquSKOwHQC62zdfhsv6yQPniKw0pWjGQTWKfJ3BBMGyJOTXw87yJ\n"
-"NwIDAQAB\n"
-"-----END PUBLIC KEY-----\n"
-;
+char KMS_PUBKEY_PEM[1600] = {0};
+
+// Allow filling the KMS public key from the config
+void secureMqttSetKmsPubkey(const char* pem) {
+  if (!pem) return;
+  size_t len = strlen(pem);
+  if (len >= sizeof(KMS_PUBKEY_PEM)) {
+    len = sizeof(KMS_PUBKEY_PEM) - 1;
+  }
+  memcpy(KMS_PUBKEY_PEM, pem, len);
+  KMS_PUBKEY_PEM[len] = '\0';
+}
 
 // Hex helpers
 static void bytesToHex(const uint8_t* in, size_t len, char* out, size_t outSize) {
