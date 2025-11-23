@@ -41,10 +41,8 @@ const char* mqttClientId = IS_TEMPERATURE_NODE ? "esp32_temp_client"
 // MQTT client config
 const char* mqttServer = MQQTSERVER; // ip address printed by the broker
 const int mqttPort = 1883;
-const char* topic_pub = IS_TEMPERATURE_NODE ? "iot/esp32/temperature"
-                                            : "iot/esp32/humidity";
-const char* topic_data_sub = IS_TEMPERATURE_NODE ? "iot/esp32/humidity"
-                                                 : "iot/esp32/temperature";
+const char* topic_pub      = "iot/esp32/data";
+const char* topic_data_sub = "iot/esp32/data";
 const char* topic_cmd_sub = "iot/esp32/commands";
 
 void setup() {
@@ -54,6 +52,7 @@ void setup() {
 
   client.setServer(mqttServer, mqttPort);
   client.setCallback(messageReceived);
+  client.setBufferSize(1024);
 
   // Secure MQTT: set the topic name
   secureMqttSetTopic(topic_pub);

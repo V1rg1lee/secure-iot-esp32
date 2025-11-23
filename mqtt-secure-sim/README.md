@@ -53,6 +53,7 @@ uv pip install -r requirements.txt
 
 In another terminal, launch the Mosquitto broker:
 
+### On Linux
 ```bash
 sudo mosquitto -c /etc/mosquitto/mosquitto.conf -v
 ```
@@ -76,6 +77,15 @@ and the folder /etc/mosquitto/conf.d should contain a file named `esp32.conf` wi
 listener 1883 0.0.0.0
 allow_anonymous true
 ```
+
+### On Windows
+
+You have to be in the folder where mosquitto.conf is located (root folder of the project):
+
+```bash
+mosquitto -c mosquitto.conf -v
+```
+
 
 ## 4. Launch the demo
 

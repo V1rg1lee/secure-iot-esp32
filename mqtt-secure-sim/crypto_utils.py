@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives import hashes
 
 
 def generate_kms_keys():
@@ -33,10 +34,7 @@ def hkdf(ikm: bytes, info: bytes, length: int, salt: bytes = None) -> bytes:
 def sign(privkey, data: bytes) -> bytes:
     return privkey.sign(
         data,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH,
-        ),
+        padding.PKCS1v15(),
         hashes.SHA256(),
     )
 

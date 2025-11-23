@@ -9,7 +9,7 @@
 
 static char g_topicName[64] = {0};
 static uint8_t g_topicKey[32];
-static bool g_topicKeyReady = true;
+static bool g_topicKeyReady = false;
 static uint32_t g_counter = 0;
 
 static uint8_t g_lastChallenge[32];
@@ -17,44 +17,51 @@ static bool g_haveChallenge = false;
 
 // TO BE REPLACED: given by the KMS after launch 
 const uint8_t CLIENT_MASTER_KEY[32] = {
-  0x2a,
-  0x2d,
-  0x8b,
-  0x81,
-  0xb2,
-  0xe6,
-  0xfb,
-  0x4b,
-  0x73,
-  0x37,
-  0x7c,
-  0x75,
-  0x91,
-  0xd6,
-  0x40,
-  0x0d,
-  0xcc,
-  0x21,
-  0x5a,
-  0x65,
-  0xf6,
-  0x0d,
+  0xda,
+  0xe9,
+  0x98,
+  0xd9,
+  0x46,
+  0x3a,
+  0xea,
+  0x14,
+  0xeb,
+  0xea,
   0x26,
-  0x37,
-  0xa9,
-  0x23,
-  0x9b,
-  0x51,
-  0x1f,
-  0x94,
-  0xb4,
-  0xbc
+  0x30,
+  0x47,
+  0xb9,
+  0x04,
+  0xdd,
+  0x9a,
+  0x63,
+  0xa0,
+  0x4e,
+  0x98,
+  0xf8,
+  0x85,
+  0x1c,
+  0xca,
+  0x6c,
+  0xa6,
+  0x21,
+  0x2e,
+  0xaa,
+  0x95,
+  0x95
 };
 
 // TO BE REPLACED: KMS public key in PEM format for signature verification
-const char KMS_PUBKEY_PEM[] = "-----BEGIN PUBLIC KEY-----
-EXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHEREEXEMPLEPUBLICKEYDATAHERE
------END PUBLIC KEY-----"
+const char KMS_PUBKEY_PEM[] =
+"-----BEGIN PUBLIC KEY-----\n"
+"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjKNz+6X84leMhmvil33d\n"
+"xXI8RF1zDYJoL9l8DanZf0uNdHXt3Wyich26XYDOrEtkb9YZ5nUV8LrNfBMJ45nK\n"
+"G2fOFpmDBCEmLQGwwKNJejrdG+tR+2C/c31Wr0nxwwAPZsiU/MFRYBIGO2vqMXxv\n"
+"cixrvNTb6M0iu+sDEkV2ppg52CPj9DZu05muBkuI4uZal4uEXgLgrc7OfSHW70ts\n"
+"2PecXKkDQG2WB233JT7vTi3GY+DkTxoX8ICzENz6UWOUcsStFuaz3iG5q/58LKYP\n"
+"kLyRi/XkZnK3WquSKOwHQC62zdfhsv6yQPniKw0pWjGQTWKfJ3BBMGyJOTXw87yJ\n"
+"NwIDAQAB\n"
+"-----END PUBLIC KEY-----\n"
 ;
 
 // Hex helpers
@@ -330,17 +337,29 @@ bool secureMqttHandleKmsMessage(const char* topic,
   Serial.print(" payload=");
   Serial.println(jsonBuf);
 
+  if (strcmp(action, "auth") == 0) {
+    return false; // should not happen, we are the client
+  }
+
+  if (strcmp(action, "clientverify") == 0) {
+    return false; // should not happen, we are the client
+  }
+
   if (strcmp(action, "clientauth") == 0) {
     Serial.println("[SEC] Handling clientauth");
     handleClientAuth(jsonBuf, baseTopic, clientId, client);
-  } else if (strcmp(action, "key") == 0) {
+    return true;
+  } 
+  
+  if (strcmp(action, "key") == 0) {
     Serial.println("[SEC] Handling key");
     handleKeyMessage(jsonBuf);
-  } else {
-    Serial.println("[SEC] Unknown KMS action, ignoring");
-  }
+    return true;
+  } 
 
-  return true;
+  Serial.println("[SEC] Unknown KMS action, ignoring");
+
+  return false;
 }
 
 bool secureMqttEncryptAndPublish(PubSubClient& client,

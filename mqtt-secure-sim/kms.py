@@ -27,7 +27,7 @@ class KMS:
         self.base_topic = base_topic  # ex: "iot/esp32"
 
         # (client_id, topic) -> TOPIC_key (AES-256)
-        self.topic_keys: Dict[Tuple[str, str], bytes] = {}
+        self.topic_keys: Dict[str, bytes] = {}
 
     # The KMS should listen to all topics: base_topic/CLIENT_ID/kms/...
     # Example: iot/esp32/client_1/kms/auth
@@ -113,9 +113,9 @@ class KMS:
 
         # Generate or retrieve TOPIC_key
         key_id = (client_id, topic_name)
-        if key_id not in self.topic_keys:
-            self.topic_keys[key_id] = os.urandom(32)  # AES-256
-        topic_key = self.topic_keys[key_id]
+        if topic_name not in self.topic_keys:
+            self.topic_keys[topic_name] = os.urandom(32)
+        topic_key = self.topic_keys[topic_name]
 
         # Wrap TOPIC_key with AES-GCM under TOPIC_key_enc_key
         iv = os.urandom(12)

@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives import serialization
 BASE_TOPIC = "iot/esp32"
 BROKER_HOST = "localhost"
 BROKER_PORT = 1883
-ESP_CLIENT_ID = "esp32_client"
+CLIENT_IDS = ["esp32_temp_client", "esp32_hum_client"]
 
 def print_kms_pubkey_c_snippet(kms_pubkey):
     pub_pem: bytes = kms_pubkey.public_bytes(
@@ -46,26 +46,21 @@ def main():
     kms = KMS(mqtt_kms, kms_priv, kms_pub, kms_master_key, BASE_TOPIC)
 
     # 4) Derive the CLIENT_master_key for the ESP32
-    client_master_key = hkdf(kms_master_key,
-                             info=ESP_CLIENT_ID.encode(),
-                             length=32)
+    for cid in CLIENT_IDS:
+        client_master_key = hkdf(kms_master_key, info=cid.encode(), length=32)
+        print(f"// CLIENT_MASTER_KEY for {cid}")
+        print("const uint8_t CLIENT_MASTER_KEY[32] = {")
+        for i, b in enumerate(client_master_key):
+            end = "," if i < 31 else ""
+            print(f"  0x{b:02x}{end}")
+        print("};")
+    print()
 
-    print("=== KMS SERVER STARTED ===")
-    print(f"MQTT Broker : {BROKER_HOST}:{BROKER_PORT}")
-    print(f"Base topic  : {BASE_TOPIC}")
-    print(f"Client ID   : {ESP_CLIENT_ID}")
-    print()
-    print("CLIENT_MASTER_KEY for the ESP32 (32 bytes) :")
-    print("const uint8_t CLIENT_MASTER_KEY[32] = {")
-    for i, b in enumerate(client_master_key):
-        end = "," if i < 31 else ""
-        print(f"  0x{b:02x}{end}")
-    print("};")
-    print()
+    # 5) Print KMS public key in C snippet
     print_kms_pubkey_c_snippet(kms_pub)
     print("⚠ Copy these values into secure_mqtt.cpp (CLIENT_MASTER_KEY and KMS_PUBKEY_PEM).")
 
-    # 5) MQTT loop (blocking)
+    # 6) MQTT loop (blocking)
     mqtt_kms.loop_forever()
 
 
