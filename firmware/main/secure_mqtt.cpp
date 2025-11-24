@@ -1,16 +1,21 @@
 #include "secure_mqtt.h"
-
+#include <Preferences.h>
 #include "secure_crypto.h"
 #include <Arduino.h>
 #include <string.h>
 #include <stdio.h>
+
+// ========= Persistent storage for counter =========
+static Preferences secPrefs;
+static uint32_t g_counter = 0;
+static uint32_t g_counterLastSaved = 0;
+static const char* COUNTER_KEY = "ctr"; 
 
 // ========= PROTOCOL CONFIG =========
 
 static char g_topicName[64] = {0};
 static uint8_t g_topicKey[32];
 static bool g_topicKeyReady = false;
-static uint32_t g_counter = 0;
 
 static uint8_t g_lastChallenge[32];
 static bool g_haveChallenge = false;
@@ -20,6 +25,26 @@ uint8_t CLIENT_MASTER_KEY[32] = {0};
 
 // TO BE REPLACED: KMS public key in PEM format for signature verification
 char KMS_PUBKEY_PEM[1600] = {0};
+
+static char g_clientId[64] = {0};
+
+static uint32_t g_lastRemoteCounter = 0;
+
+void secureMqttSetClientId(const char* client_id) {
+  strncpy(g_clientId, client_id, sizeof(g_clientId)-1);
+  g_clientId[sizeof(g_clientId)-1] = '\0';
+}
+
+void secureMqttInit(const char* topic_name, const char* client_id) {
+  secureMqttSetTopic(topic_name);
+
+  secPrefs.begin("sec", false);
+  g_counter = secPrefs.getULong(COUNTER_KEY, 0);
+  g_counterLastSaved = g_counter;
+
+  Serial.print("[SEC] Loaded persistent counter = ");
+  Serial.println(g_counter);
+}
 
 // Allow filling the KMS public key from the config
 void secureMqttSetKmsPubkey(const char* pem) {
@@ -273,7 +298,6 @@ static void handleKeyMessage(const char* json) {
 
   memcpy(g_topicKey, plain, 32);
   g_topicKeyReady = true;
-  g_counter = 0;
   Serial.println("[SEC] TOPIC_key received and stored.");
 }
 
@@ -339,6 +363,14 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
     return false;
   }
 
+  g_counter++;
+  if (g_counter - g_counterLastSaved >= 1) {
+    secPrefs.putULong(COUNTER_KEY, g_counter);
+    g_counterLastSaved = g_counter;
+    Serial.print("[SEC] Persistent counter saved = ");
+    Serial.println(g_counter);
+  }
+
   uint8_t iv[12];
   sc_random_bytes(iv, sizeof(iv));
 
@@ -393,10 +425,15 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
 
   char payload[1024];
   snprintf(payload, sizeof(payload),
-           "{\"iv\":\"%s\",\"counter\":%lu,\"ciphertext\":\"%s\",\"tag\":\"%s\",\"topic_name\":\"%s\"}",
-           ivHex, (unsigned long)g_counter, ctHex, tagHex, g_topicName);
-
-  g_counter++;
+         "{\"iv\":\"%s\",\"counter\":%lu,"
+         "\"ciphertext\":\"%s\",\"tag\":\"%s\","
+         "\"topic_name\":\"%s\",\"sender_id\":\"%s\"}",
+         ivHex,
+         (unsigned long)g_counter,
+         ctHex,
+         tagHex,
+         g_topicName,
+         g_clientId);
 
   return client.publish(appTopic, payload);
 }
@@ -427,6 +464,7 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
   char tagHex[16*2+1];
   char topicNameBuf[64];
   int counter = 0;
+  char senderId[64];
 
   if (!extractJsonStringField(jsonBuf, "iv", ivHex, sizeof(ivHex))) {
     Serial.println("[SEC] Decrypt: iv missing");
@@ -448,6 +486,27 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
     Serial.println("[SEC] Decrypt: topic_name missing");
     return false;
   }
+  if (!extractJsonStringField(jsonBuf, "sender_id", senderId, sizeof(senderId))) {
+  Serial.println("[SEC] Decrypt: sender_id missing");
+  return false;
+  }
+
+  extern const char* mqttClientId; 
+  if (strcmp(senderId, mqttClientId) == 0) {
+    Serial.println("[SEC] Decrypt: own message, ignoring");
+    return false;
+  }
+
+  if ((uint32_t)counter <= g_lastRemoteCounter) {
+    Serial.print("[SEC] Replay detected from ");
+    Serial.print(senderId);
+    Serial.print(" counter=");
+    Serial.print(counter);
+    Serial.print(" last=");
+    Serial.println(g_lastRemoteCounter);
+    return false;
+  }
+  g_lastRemoteCounter = (uint32_t)counter;
 
   if (strcmp(topicNameBuf, expectedTopic) != 0) {
     Serial.print("[SEC] Decrypt: topic_name mismatch (payload=");

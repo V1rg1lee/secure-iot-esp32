@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <PubSubClient.h>
 
+void secureMqttInit(const char* topic_name, const char* client_id);
+
+void secureMqttSetClientId(const char* client_id);
+
 // TO ADJUST: 32-byte CLIENT_MASTER_KEY provisioned (copied from your Python simulation)
 extern uint8_t CLIENT_MASTER_KEY[32];
 

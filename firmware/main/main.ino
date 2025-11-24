@@ -276,6 +276,8 @@ void setup() {
   client.setBufferSize(1024);
 
   secureMqttSetTopic(topic_pub);
+  secureMqttSetClientId(mqttClientId);
+  secureMqttInit(topic_pub, mqttClientId);
 
   Serial.println("Init OK (debounce + DHT11 on GPIO 26)");
 }
