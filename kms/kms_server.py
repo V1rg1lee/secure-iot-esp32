@@ -1,20 +1,24 @@
 import os
 import json
+import time
+import threading
 import paho.mqtt.client as mqtt
 
-from crypto_utils import generate_kms_keys, hkdf
+from crypto_utils import generate_kms_keys, hkdf, aes_gcm_encrypt
 from kms import KMS
 
 from cryptography.hazmat.primitives import serialization
 from dotenv import load_dotenv
 
-
+# ====== KEY ROTATION CONFIG ======
+ROTATE_PERIOD_SECONDS = 60  # duration of an epoch before rotating the TOPIC_key
 # Load the .env at the project root
 load_dotenv()
 
 # ==== COMMON CONFIG WITH THE ESP32s ====
 
 BASE_TOPIC = "iot/esp32"
+DATA_TOPIC = f"{BASE_TOPIC}/data"
 
 # Broker taken from .env (with defaults)
 BROKER_HOST = os.getenv("MQTT_BROKER", "localhost")
@@ -107,6 +111,72 @@ def print_esp_json_templates(
     print(json.dumps(cfg_hum, separators=(",", ":")))
 
 
+# ========= ROTATION / REKEY LOGIC =========
+
+def send_rekey_for_client(kms: KMS, client_id: str, topic_name: str, epoch: int):
+    """Build and send a /kms/rekey message for a given client.
+
+    The message is published on: BASE_TOPIC/<client_id>/kms/rekey
+    Payload (JSON): { topic, epoch, iv, ciphertext, tag } where binary fields
+    are hex-encoded strings.
+    """
+
+    # 1) Derive topic_key_enc_key (same derivation as for /kms/key)
+    client_master_key = kms.derive_client_master_key(client_id)
+    topic_auth_key, topic_key_enc_key = kms.derive_topic_keys_material(
+        client_master_key, topic_name
+    )
+
+    # 2) Retrieve the TOPIC_key (create one if it doesn't exist)
+    if topic_name not in kms.topic_keys:
+        kms.topic_keys[topic_name] = os.urandom(32)
+    topic_key = kms.topic_keys[topic_name]
+
+    # 3) AES-GCM encrypt the TOPIC_key
+    iv = os.urandom(12)
+    ciphertext, tag = aes_gcm_encrypt(
+        topic_key_enc_key, iv, topic_key, aad=b"KMS_TOPIC_KEY"
+    )
+
+    response = {
+        "topic": topic_name,
+        "epoch": epoch,
+        "iv": iv.hex(),
+        "ciphertext": ciphertext.hex(),
+        "tag": tag.hex(),
+    }
+
+    resp_topic = f"{BASE_TOPIC}/{client_id}/kms/rekey"
+    payload = json.dumps(response, separators=(",", ":")).encode()
+    print(f"[KMS] Sending REKEY to {resp_topic}: {payload!r}")
+    kms.mqtt.publish(resp_topic, payload)
+
+
+def rotation_loop(kms: KMS):
+    """Thread that advances the epoch every ROTATE_PERIOD_SECONDS and:
+    - generates a new TOPIC_key for DATA_TOPIC
+    - sends a /kms/rekey to each ESP
+    """
+
+    epoch = 0
+
+    # Wait a bit for the ESPs to complete their initial handshake
+    time.sleep(5)
+
+    while True:
+        epoch += 1
+        print(f"[KMS] === New epoch {epoch} (rotating TOPIC_key for {DATA_TOPIC}) ===")
+
+        # New random TOPIC_key for this topic
+        kms.topic_keys[DATA_TOPIC] = os.urandom(32)
+
+        # Send the rekey to both ESPs
+        for cid in (ESP_CLIENT_ID_TEMP, ESP_CLIENT_ID_HUM):
+            send_rekey_for_client(kms, cid, DATA_TOPIC, epoch)
+
+        time.sleep(ROTATE_PERIOD_SECONDS)
+
+
 def main():
     # 1) MQTT client for the KMS
     mqtt_kms = mqtt.Client(
@@ -132,7 +202,9 @@ def main():
     print("=== KMS SERVER STARTED ===")
     print(f"MQTT Broker : {BROKER_HOST}:{BROKER_PORT}")
     print(f"Base topic  : {BASE_TOPIC}")
+    print(f"Data topic  : {DATA_TOPIC}")
     print(f"Clients     : {ESP_CLIENT_ID_TEMP}, {ESP_CLIENT_ID_HUM}")
+    print(f"Rotate period (seconds) : {ROTATE_PERIOD_SECONDS}")
     print()
 
     # (Optional) Print C representation if you still need it
@@ -154,13 +226,17 @@ def main():
     print_kms_pubkey_c_snippet(kms_pub)
 
     print(
-        "⚠ Copy CLIENT_MASTER_KEY and KMS_PUBKEY_PEM into secure_mqtt.cpp if necessary.\n"
+        "WARNING: Now provision each ESP32 with the JSON below (serial provisioning).\n"
     )
 
     # 5) Print the JSON blobs to paste into the ESP (serial provisioning)
     print_esp_json_templates(kms_pub_pem, client_master_key_temp, client_master_key_hum)
 
-    # 6) MQTT loop (blocking)
+    # 6) Start the key rotation thread
+    t = threading.Thread(target=rotation_loop, args=(kms,), daemon=True)
+    t.start()
+
+    # 7) MQTT loop (blocking)
     mqtt_kms.loop_forever()
 
 

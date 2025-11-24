@@ -14,8 +14,15 @@ static const char* COUNTER_KEY = "ctr";
 // ========= PROTOCOL CONFIG =========
 
 static char g_topicName[64] = {0};
-static uint8_t g_topicKey[32];
+
+// Two topic keys for key rotation
+static uint8_t g_topicKeyCurrent[32];
+static uint8_t g_topicKeyPrev[32];
 static bool g_topicKeyReady = false;
+
+// Epochs
+static uint32_t g_epochCurrent = 0;
+static uint32_t g_epochPrev = 0;
 
 static uint8_t g_lastChallenge[32];
 static bool g_haveChallenge = false;
@@ -249,6 +256,7 @@ static void handleKeyMessage(const char* json) {
   char ivHex[12*2+1];
   char ctHex[128*2+1];   // large buffer
   char tagHex[16*2+1];
+  int epoch = 0;
 
   if (!extractJsonStringField(json, "topic", topicBuf, sizeof(topicBuf))) {
     Serial.println("[SEC] key.topic missing");
@@ -270,6 +278,9 @@ static void handleKeyMessage(const char* json) {
   if (!extractJsonStringField(json, "tag", tagHex, sizeof(tagHex))) {
     Serial.println("[SEC] key.tag missing");
     return;
+  }
+  if (!extractJsonIntField(json, "epoch", &epoch)) {
+    epoch = 0;
   }
 
   uint8_t iv[12];
@@ -296,9 +307,17 @@ static void handleKeyMessage(const char* json) {
     return;
   }
 
-  memcpy(g_topicKey, plain, 32);
+  if (g_topicKeyReady) {
+    memcpy(g_topicKeyPrev, g_topicKeyCurrent, 32);
+    g_epochPrev = g_epochCurrent;
+  }
+
+  memcpy(g_topicKeyCurrent, plain, 32);
+  g_epochCurrent = (uint32_t)epoch;
   g_topicKeyReady = true;
-  Serial.println("[SEC] TOPIC_key received and stored.");
+
+  Serial.print("[SEC] TOPIC_key updated. New epoch = ");
+  Serial.println(g_epochCurrent);
 }
 
 bool secureMqttHandleKmsMessage(const char* topic,
@@ -349,6 +368,12 @@ bool secureMqttHandleKmsMessage(const char* topic,
     return true;
   } 
 
+  if (strcmp(action, "rekey") == 0) {
+    Serial.println("[SEC] Handling rekey");
+    handleKeyMessage(jsonBuf);
+    return true;
+  }
+
   Serial.println("[SEC] Unknown KMS action, ignoring");
 
   return false;
@@ -391,7 +416,7 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
   memcpy(salt, iv, 12);
   memcpy(salt+12, counterBytes, 4);
   uint8_t aesKey[32];
-  sc_hkdf_sha256(g_topicKey, sizeof(g_topicKey),
+  sc_hkdf_sha256(g_topicKeyCurrent, sizeof(g_topicKeyCurrent),
                  salt, sizeof(salt),
                  (const uint8_t*)g_topicName, strlen(g_topicName),
                  aesKey, sizeof(aesKey));
@@ -427,13 +452,14 @@ bool secureMqttEncryptAndPublish(PubSubClient& client,
   snprintf(payload, sizeof(payload),
          "{\"iv\":\"%s\",\"counter\":%lu,"
          "\"ciphertext\":\"%s\",\"tag\":\"%s\","
-         "\"topic_name\":\"%s\",\"sender_id\":\"%s\"}",
+         "\"topic_name\":\"%s\",\"sender_id\":\"%s\",\"epoch\":%lu}",
          ivHex,
          (unsigned long)g_counter,
          ctHex,
          tagHex,
          g_topicName,
-         g_clientId);
+         g_clientId,
+         (unsigned long)g_epochCurrent);
 
   return client.publish(appTopic, payload);
 }
@@ -490,6 +516,11 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
   Serial.println("[SEC] Decrypt: sender_id missing");
   return false;
   }
+  int epoch = 0;
+  if (!extractJsonIntField(jsonBuf, "epoch", &epoch)) {
+    Serial.println("[SEC] Decrypt: epoch missing");
+    return false;
+  }
 
   extern const char* mqttClientId; 
   if (strcmp(senderId, mqttClientId) == 0) {
@@ -539,8 +570,20 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
   memcpy(salt, iv, 12);
   memcpy(salt+12, counterBytes, 4);
 
+  const uint8_t* topicKeyForThisMsg = nullptr;
+
+  if ((uint32_t)epoch == g_epochCurrent) {
+    topicKeyForThisMsg = g_topicKeyCurrent;
+  } else if ((uint32_t)epoch == g_epochPrev) {
+    topicKeyForThisMsg = g_topicKeyPrev;
+  } else {
+    Serial.print("[SEC] Decrypt: unknown epoch ");
+    Serial.println(epoch);
+    return false;
+  }
+
   uint8_t aesKey[32];
-  sc_hkdf_sha256(g_topicKey, sizeof(g_topicKey),
+  sc_hkdf_sha256(topicKeyForThisMsg, 32,
                  salt, sizeof(salt),
                  (const uint8_t*)topicNameBuf, strlen(topicNameBuf),
                  aesKey, sizeof(aesKey));
