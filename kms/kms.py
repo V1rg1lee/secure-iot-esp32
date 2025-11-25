@@ -81,6 +81,8 @@ class KMS:
             self.handle_auth(client_id, data)
         elif action == "clientverify":
             self.handle_clientverify(client_id, data)
+        elif action == "request_key":
+            self.handle_request_key(client_id, data)
 
     # ---------- KMS logic ----------
 
@@ -142,4 +144,43 @@ class KMS:
         resp_topic = f"{self.base_topic}/{client_id}/kms/key"
         payload = json.dumps(response, separators=(",", ":")).encode()
         print(f"[KMS] Sending key to {resp_topic}: {payload!r}")
+        self.mqtt.publish(resp_topic, payload)
+
+    def handle_request_key(self, client_id: str, data: dict):
+        """
+        Handle a client's request to obtain the current TOPIC_key for a topic.
+        Expected payload: { "topic": "<topic_name>" }
+        This publishes the wrapped TOPIC_key on BASE_TOPIC/<client_id>/kms/key
+        """
+        topic_name = data.get("topic")
+        if not topic_name:
+            print(f"[KMS] request_key missing topic from client {client_id}")
+            return
+
+        # Generate or retrieve TOPIC_key
+        if topic_name not in self.topic_keys:
+            self.topic_keys[topic_name] = os.urandom(32)
+        topic_key = self.topic_keys[topic_name]
+
+        # derive topic_key_enc_key for this client/topic
+        client_master_key = self.derive_client_master_key(client_id)
+        topic_auth_key, topic_key_enc_key = self.derive_topic_keys_material(
+            client_master_key, topic_name
+        )
+
+        iv = os.urandom(12)
+        ciphertext, tag = aes_gcm_encrypt(
+            topic_key_enc_key, iv, topic_key, aad=b"KMS_TOPIC_KEY"
+        )
+
+        response = {
+            "topic": topic_name,
+            "iv": iv.hex(),
+            "ciphertext": ciphertext.hex(),
+            "tag": tag.hex(),
+        }
+
+        resp_topic = f"{self.base_topic}/{client_id}/kms/key"
+        payload = json.dumps(response, separators=(",", ":")).encode()
+        print(f"[KMS] Sending key (on request) to {resp_topic}: {payload!r}")
         self.mqtt.publish(resp_topic, payload)

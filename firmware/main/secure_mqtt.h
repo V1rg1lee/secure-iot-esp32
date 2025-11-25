@@ -48,3 +48,11 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
                               const char* expectedTopic,
                               char* outBuffer,
                               size_t outBufferSize);
+
+// Set to true when the last decrypt failed due to AES-GCM tag/verification
+// (i.e. the payload could not be authenticated). The MQTT layer can
+// observe this flag and request a rekey from the KMS.
+extern volatile bool g_secureDecryptTagFailure;
+
+// Consume and clear the decrypt-failure flag (atomic-ish)
+bool secureMqttConsumeDecryptFailure();

@@ -75,6 +75,15 @@ static void bytesToHex(const uint8_t* in, size_t len, char* out, size_t outSize)
   out[2*len] = '\0';
 }
 
+// decrypt-failure flag (set when AES-GCM verification fails)
+volatile bool g_secureDecryptTagFailure = false;
+
+bool secureMqttConsumeDecryptFailure() {
+  bool v = g_secureDecryptTagFailure;
+  g_secureDecryptTagFailure = false;
+  return v;
+}
+
 static size_t hexToBytes(const char* hex, uint8_t* out, size_t maxLen) {
   size_t hexLen = strlen(hex);
   size_t outLen = hexLen / 2;
@@ -601,6 +610,8 @@ bool secureMqttDecryptPayload(const uint8_t* payload,
                                (uint8_t*)outBuffer);
   if (!ok) {
     Serial.println("[SEC] AES-GCM decrypt failed");
+    // mark tag/auth failure so the MQTT layer can request a rekey
+    g_secureDecryptTagFailure = true;
     return false;
   }
 

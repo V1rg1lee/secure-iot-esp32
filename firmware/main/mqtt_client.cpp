@@ -84,6 +84,25 @@ void messageReceived(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
+
+  // If decryption failed due to tag/auth failure, request current TOPIC_key from KMS.
+  // Throttle requests to avoid spamming the KMS (5s).
+  if (secureMqttConsumeDecryptFailure()) {
+    static unsigned long lastRekeyRequestMs = 0;
+    unsigned long now = millis();
+    if (now - lastRekeyRequestMs > 5000) { // if more than 5s since last request
+      lastRekeyRequestMs = now;
+      // publish a simple request: {"topic":"<expectedTopic>"}
+      char reqTopic[128];
+      snprintf(reqTopic, sizeof(reqTopic), "%s/%s/kms/request_key", "iot/esp32", mqttClientId);
+      char body[128];
+      // expected app topic is topic_data_sub (we used that as expectedTopic)
+      snprintf(body, sizeof(body), "{\"topic\":\"%s\"}", topic);
+      Serial.print("[MQTT] Decrypt tag failure -> requesting key from KMS on ");
+      Serial.println(reqTopic);
+      client.publish(reqTopic, body);
+    }
+  }
 }
 
 extern PubSubClient client;
