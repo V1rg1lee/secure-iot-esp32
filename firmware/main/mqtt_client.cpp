@@ -9,6 +9,8 @@ float g_remoteHumidity = 0.0f;
 bool g_remoteHumidityValid = false;
 float g_remoteTemperature = 0.0f;
 bool g_remoteTemperatureValid = false;
+unsigned long g_remoteHumidityLastMs = 0;
+unsigned long g_remoteTemperatureLastMs = 0;
 
 static bool extractFloatField(const byte* payload,
                               unsigned int length,
@@ -66,11 +68,13 @@ void messageReceived(char* topic, byte* payload, unsigned int length) {
     if (extractFloatField(parsePayload, parseLen, "humidity", &value)) {
       g_remoteHumidity = value;
       g_remoteHumidityValid = true;
+      g_remoteHumidityLastMs = millis();
       parsed = true;
     }
     if (extractFloatField(parsePayload, parseLen, "temperature", &value)) {
       g_remoteTemperature = value;
       g_remoteTemperatureValid = true;
+      g_remoteTemperatureLastMs = millis();
       parsed = true;
     }
   }

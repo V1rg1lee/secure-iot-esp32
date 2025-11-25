@@ -38,6 +38,8 @@ int lastStableButton   = LOW;
 // Reading DHT11 periodically
 unsigned long lastDht = 0;
 const unsigned long dhtEveryMs = 2000; // ms
+// If no data from the other ESP for this many milliseconds, treat as stale
+const unsigned long REMOTE_TIMEOUT_MS = 10000; // 10 seconds
 
 // Wifi config
 WiFiClient espClient;
@@ -332,22 +334,34 @@ void loop() {
     char tempStr[8];
     char humStr[8];
 
+    // Check freshness of remote values: must have been received within timeout
+    bool remoteHumidityFresh = g_remoteHumidityValid &&
+                               (g_remoteHumidityLastMs != 0) &&
+                               (now - g_remoteHumidityLastMs <= REMOTE_TIMEOUT_MS);
+    bool remoteTemperatureFresh = g_remoteTemperatureValid &&
+                                  (g_remoteTemperatureLastMs != 0) &&
+                                  (now - g_remoteTemperatureLastMs <= REMOTE_TIMEOUT_MS);
+
     if (IS_TEMPERATURE_NODE) {
       if (th.ok) {
         snprintf(tempStr, sizeof(tempStr), "%.1f", temperatureToSend);
       } else {
         snprintf(tempStr, sizeof(tempStr), "?");
       }
-      if (g_remoteHumidityValid) {
+      if (remoteHumidityFresh) {
         snprintf(humStr, sizeof(humStr), "%.1f", g_remoteHumidity);
       } else {
+        // stale or never received -> show '?'
         snprintf(humStr, sizeof(humStr), "?");
+        // mark as invalid to avoid using old values elsewhere
+        g_remoteHumidityValid = false;
       }
     } else {
-      if (g_remoteTemperatureValid) {
+      if (remoteTemperatureFresh) {
         snprintf(tempStr, sizeof(tempStr), "%.1f", g_remoteTemperature);
       } else {
         snprintf(tempStr, sizeof(tempStr), "?");
+        g_remoteTemperatureValid = false;
       }
       if (th.ok) {
         snprintf(humStr, sizeof(humStr), "%.1f", humidityToSend);
@@ -356,8 +370,8 @@ void loop() {
       }
     }
 
-    bool displayOk = (IS_TEMPERATURE_NODE ? th.ok : g_remoteTemperatureValid) ||
-                     (!IS_TEMPERATURE_NODE ? th.ok : g_remoteHumidityValid);
+    bool displayOk = (IS_TEMPERATURE_NODE ? th.ok : remoteTemperatureFresh) ||
+             (!IS_TEMPERATURE_NODE ? th.ok : remoteHumidityFresh);
 
     oledShowTempHumText(tempStr, humStr, displayOk);
   }
