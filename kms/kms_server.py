@@ -32,6 +32,10 @@ ESP_CLIENT_ID_HUM = "esp32_hum_client"
 DEFAULT_WIFI_SSID = os.getenv("WIFI_SSID", "YOUR_WIFI_SSID")
 DEFAULT_WIFI_PASSWORD = os.getenv("WIFI_PASSWORD", "YOUR_WIFI_PASSWORD")
 
+# Blacklist read from .env (with fallback)
+BLACKLIST = os.getenv("BLACKLIST", "YOUR_BLACKLISTED_CLIENT_ID")
+BLACKLISTED_CLIENT_IDS = [x for x in BLACKLIST.split(",") if x]
+
 
 def get_kms_pubkey_pem(kms_pubkey):
     """
@@ -94,21 +98,26 @@ def print_esp_json_templates(
         "kms_pubkey_pem": kms_pubkey_pem,
     }
 
-    # TEMP – pretty
-    print("\n================ ESP32 TEMP NODE – JSON (pretty) ================")
-    print(json.dumps(cfg_temp, indent=2))
+    if "esp32_temp_client" in BLACKLISTED_CLIENT_IDS:
+        print("WARNING: esp32_temp_client is blacklisted. Skipping its JSON generation.")
+    else:
+        # TEMP – pretty
+        print("\n================ ESP32 TEMP NODE – JSON (pretty) ================")
+        print(json.dumps(cfg_temp, indent=2))
 
-    # TEMP – one-line
-    print("\n================ ESP32 TEMP NODE – JSON (one-line) ==============")
-    print(json.dumps(cfg_temp, separators=(",", ":")))
+        # TEMP – one-line
+        print("\n================ ESP32 TEMP NODE – JSON (one-line) ==============")
+        print(json.dumps(cfg_temp, separators=(",", ":")))
+    if "esp32_hum_client" in BLACKLISTED_CLIENT_IDS:
+        print ("WARNING: esp32_hum_client is blacklisted. Skipping its JSON generation.")
+    else:
+        # HUM – pretty
+        print("\n================ ESP32 HUM NODE – JSON (pretty) =================")
+        print(json.dumps(cfg_hum, indent=2))
 
-    # HUM – pretty
-    print("\n================ ESP32 HUM NODE – JSON (pretty) =================")
-    print(json.dumps(cfg_hum, indent=2))
-
-    # HUM – one-line
-    print("\n================ ESP32 HUM NODE – JSON (one-line) ===============")
-    print(json.dumps(cfg_hum, separators=(",", ":")))
+        # HUM – one-line
+        print("\n================ ESP32 HUM NODE – JSON (one-line) ===============")
+        print(json.dumps(cfg_hum, separators=(",", ":")))
 
 
 # ========= ROTATION / REKEY LOGIC =========
@@ -170,9 +179,10 @@ def rotation_loop(kms: KMS):
         # New random TOPIC_key for this topic
         kms.topic_keys[DATA_TOPIC] = os.urandom(32)
 
-        # Send the rekey to both ESPs
+        # Send the rekey to both ESPs (if not blacklisted)
         for cid in (ESP_CLIENT_ID_TEMP, ESP_CLIENT_ID_HUM):
-            send_rekey_for_client(kms, cid, DATA_TOPIC, epoch)
+            if cid not in BLACKLISTED_CLIENT_IDS:
+                send_rekey_for_client(kms, cid, DATA_TOPIC, epoch)
 
         time.sleep(ROTATE_PERIOD_SECONDS)
 
@@ -232,11 +242,16 @@ def main():
     # 5) Print the JSON blobs to paste into the ESP (serial provisioning)
     print_esp_json_templates(kms_pub_pem, client_master_key_temp, client_master_key_hum)
 
-    # 6) Start the key rotation thread
+    # 6) if bth esp32 are blacklisted, exit
+    if (ESP_CLIENT_ID_TEMP in BLACKLISTED_CLIENT_IDS) and (ESP_CLIENT_ID_HUM in BLACKLISTED_CLIENT_IDS):
+        print("Both esp32 clients are blacklisted. Exiting.")
+        return
+    
+    # 7) Start the key rotation thread
     t = threading.Thread(target=rotation_loop, args=(kms,), daemon=True)
     t.start()
 
-    # 7) MQTT loop (blocking)
+    # 8) MQTT loop (blocking)
     mqtt_kms.loop_forever()
 
 
