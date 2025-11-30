@@ -186,14 +186,37 @@ def rotation_loop(kms: KMS):
 
         time.sleep(ROTATE_PERIOD_SECONDS)
 
+def on_connect(client, userdata, flags, rc, other):
+    print("✓ KMS connecté au broker MQTT")
+
+    # S'abonner aux deux ESP
+    client.subscribe(f"{BASE_TOPIC}/data/")
+    print("✓ KMS abonné aux topics MQTT")
+
+def on_message(client, userdata, msg):
+    payload = msg.payload.decode()
+    print(f"[MQTT] {msg.topic} => {payload}")
+
+    # Essayer de décoder en JSON
+    try:
+        data = json.loads(payload)
+    except:
+        print("Payload non-JSON, ignoré.")
+        return
+
 
 def main():
+
     # 1) MQTT client for the KMS
     mqtt_kms = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2, client_id="kms", protocol=mqtt.MQTTv311
     )
 
     mqtt_kms.connect(BROKER_HOST, BROKER_PORT, 60)
+
+    # 0) Setup mqtt behavior when connecting or receiving a message from MQTT
+    mqtt_kms.on_connect = on_connect
+    mqtt_kms.on_message = on_message
 
     # 2) Generate KMS keys
     kms_priv, kms_pub, kms_master_key = generate_kms_keys()
