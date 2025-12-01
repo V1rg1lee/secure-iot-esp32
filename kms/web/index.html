@@ -2,61 +2,110 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>KMS Logs</title>
-    <style>
-        body {
-            font-family: monospace;
-            background: #111;
-            color: #0f0;
-            padding: 20px;
-        }
-        .log {
-            margin-bottom: 6px;
-            padding: 5px;
-            border-bottom: 1px solid #333;
-        }
-    </style>
+        <title>KMS Logs</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 
-<h2>KMS Logs</h2>
-<div id="logs">Chargement…</div>
+<header class="site-header">
+    <div class="container">
+        <h1>KMS — Journaux</h1>
+        <p class="lead">Flux d'événements MQTT chiffrés pour les nœuds ESP32.</p>
+    </div>
+</header>
+
+<main class="container main">
+    <div class="controls">
+        <div class="meta">Dernière mise à jour : <span id="last">—</span></div>
+        <button id="btn-refresh" class="btn small">Rafraîchir</button>
+    </div>
+
+    <section id="logs" class="logs" aria-live="polite">Chargement…</section>
+</main>
 
 <script>
-async function loadLogs() {
+function formatTime(ts) {
     try {
-        const res = await fetch("http://localhost:8000/events");
-        const text = await res.text();
-
-        const logDiv = document.getElementById("logs");
-        logDiv.innerHTML = "";  // reset
-
-        const lines = text.split("\n");
-
-        for (const line of lines) {
-            if (line.trim().length === 0) continue; // ignore empty lines
-
-            try {
-                const obj = JSON.parse(line);
-
-                const div = document.createElement("div");
-                div.className = "log";
-                div.textContent = `[${obj.timestamp}] ${obj.client_id} - ${obj.topic_name} => ${obj.data}`;
-                logDiv.appendChild(div);
-
-            } catch {
-                // ignore bad lines silently
-                console.warn("Ligne ignorée (JSON invalide):", line);
-            }
-        }
-
-    } catch (err) {
-        console.error("Erreur fetch:", err);
-        document.getElementById("logs").innerHTML = "Erreur de chargement.";
+        const d = new Date(ts);
+        return d.toLocaleString();
+    } catch {
+        return ts;
     }
 }
 
-// reload ever second
+async function loadLogs() {
+    const logDiv = document.getElementById("logs");
+    const lastSpan = document.getElementById("last");
+    try {
+        const res = await fetch("http://localhost:8000/events");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        logDiv.innerHTML = "";  // reset
+
+        const lines = text.split("\n").filter(l => l.trim().length > 0);
+        if (lines.length === 0) {
+            logDiv.innerHTML = '<div class="empty">Aucun événement récent.</div>';
+            lastSpan.textContent = new Date().toLocaleTimeString();
+            return;
+        }
+
+        for (const line of lines) {
+            try {
+                const obj = JSON.parse(line);
+
+                const item = document.createElement('article');
+                item.className = 'log-item';
+
+                const metaCol = document.createElement('div');
+                metaCol.className = 'meta-col';
+                const timeBadge = document.createElement('div');
+                timeBadge.className = 'badge';
+                timeBadge.textContent = formatTime(obj.timestamp);
+                metaCol.appendChild(timeBadge);
+
+                const content = document.createElement('div');
+                content.className = 'content';
+                const title = document.createElement('div');
+                title.className = 'title';
+                title.textContent = obj.client_id || 'unknown client';
+                const topic = document.createElement('div');
+                topic.className = 'topic';
+                topic.textContent = obj.topic_name + (obj.epoch !== undefined ? ` — epoch ${obj.epoch}` : '');
+
+                const payload = document.createElement('pre');
+                payload.className = 'payload';
+                // Keep data short if very long
+                let dataText = obj.data;
+                try { dataText = JSON.stringify(obj.data); } catch {}
+                if (dataText.length > 600) dataText = dataText.slice(0,600) + '…';
+                payload.textContent = dataText;
+
+                content.appendChild(title);
+                content.appendChild(topic);
+                content.appendChild(payload);
+
+                item.appendChild(metaCol);
+                item.appendChild(content);
+
+                logDiv.appendChild(item);
+
+            } catch (e) {
+                console.warn("Ignored invalid JSON line:", e, line);
+            }
+        }
+
+        lastSpan.textContent = new Date().toLocaleTimeString();
+
+    } catch (err) {
+        console.error("Erreur fetch:", err);
+        logDiv.innerHTML = '<div class="empty">Erreur de chargement.</div>';
+        lastSpan.textContent = '—';
+    }
+}
+
+document.getElementById('btn-refresh').addEventListener('click', loadLogs);
+// reload every second
 setInterval(loadLogs, 1000);
 loadLogs();
 </script>

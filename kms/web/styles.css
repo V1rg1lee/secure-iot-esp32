@@ -1,0 +1,49 @@
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --muted:#6b7380;
+  --accent:#0f766e; /* teal */
+  --danger:#d9534f;
+  --shadow: 0 6px 18px rgba(16,24,40,0.06);
+  --mono: "Courier New", monospace;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background:var(--bg);
+  color:#0f172a;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.container{max-width:980px;margin:24px auto;padding:0 18px}
+
+.site-header{background:transparent;padding:18px 0}
+.site-header h1{margin:0;font-size:20px;letter-spacing:0.2px}
+.lead{margin:6px 0 0;color:var(--muted);font-size:14px}
+
+.main{display:block}
+.controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.meta{color:var(--muted);font-size:13px}
+.btn{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;box-shadow:var(--shadow)}
+.btn.small{padding:6px 10px;font-size:13px;border-radius:6px}
+.btn:active{transform:translateY(1px)}
+
+.logs{display:block;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.9));border-radius:12px;padding:12px;box-shadow:var(--shadow);min-height:300px;overflow:auto}
+.log-item{display:flex;gap:12px;padding:10px;border-radius:8px;background:var(--card);margin-bottom:10px;align-items:flex-start;border:1px solid rgba(15,23,42,0.04)}
+.badge{font-size:12px;padding:6px 8px;border-radius:999px;background:#eef6f4;color:var(--accent);border:1px solid rgba(15,118,110,0.06)}
+.meta-col{flex:0 0 auto}
+.content{flex:1}
+.content .title{font-weight:600;font-size:14px;margin:0 0 6px}
+.content .topic{font-size:13px;color:var(--muted);margin-bottom:6px}
+.payload{font-family:var(--mono);background:#0b1220;color:#e6f7f2;padding:10px;border-radius:6px;font-size:13px;display:inline-block}
+
+.empty{color:var(--muted);padding:18px;text-align:center}
+
+@media (max-width:560px){
+  .container{padding:0 12px}
+  .controls{flex-direction:column;align-items:flex-start;gap:8px}
+}
