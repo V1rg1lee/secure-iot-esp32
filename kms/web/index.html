@@ -10,18 +10,18 @@
 
 <header class="site-header">
     <div class="container">
-        <h1>KMS — Journaux</h1>
-        <p class="lead">Flux d'événements MQTT chiffrés pour les nœuds ESP32.</p>
+        <h1>KMS — Logs</h1>
+        <p class="lead">Encrypted MQTT event stream for ESP32 nodes.</p>
     </div>
 </header>
 
 <main class="container main">
     <div class="controls">
-        <div class="meta">Dernière mise à jour : <span id="last">—</span></div>
-        <button id="btn-refresh" class="btn small">Rafraîchir</button>
+        <div class="meta">Last updated: <span id="last">—</span></div>
+        <button id="btn-refresh" class="btn small">Refresh</button>
     </div>
 
-    <section id="logs" class="logs" aria-live="polite">Chargement…</section>
+    <section id="logs" class="logs" aria-live="polite">Loading…</section>
 </main>
 
 <script>
@@ -45,7 +45,7 @@ async function loadLogs() {
 
         const lines = text.split("\n").filter(l => l.trim().length > 0);
         if (lines.length === 0) {
-            logDiv.innerHTML = '<div class="empty">Aucun événement récent.</div>';
+            logDiv.innerHTML = '<div class="empty">Any recent event.</div>';
             lastSpan.textContent = new Date().toLocaleTimeString();
             return;
         }
@@ -128,8 +128,8 @@ async function loadLogs() {
         lastSpan.textContent = new Date().toLocaleTimeString();
 
     } catch (err) {
-        console.error("Erreur fetch:", err);
-        logDiv.innerHTML = '<div class="empty">Erreur de chargement.</div>';
+        console.error("Fetch error:", err);
+        logDiv.innerHTML = '<div class="empty">Loading error.</div>';
         lastSpan.textContent = '—';
     }
 }
