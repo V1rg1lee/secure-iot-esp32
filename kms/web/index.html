@@ -27,6 +27,19 @@
 <script>
 function formatTime(ts) {
     try {
+        // If timestamp is a numeric string, convert to number
+        if (typeof ts === 'string' && /^\d+$/.test(ts)) {
+            ts = Number(ts);
+        }
+
+        // If timestamp is a number in UNIX seconds (around 1e9), convert to ms
+        // Milliseconds timestamps are ~1e12+ for years ~2001+.
+        if (typeof ts === 'number') {
+            if (ts > 0 && ts < 1e12) {
+                ts = ts * 1000;
+            }
+        }
+
         const d = new Date(ts);
         return d.toLocaleString();
     } catch {
