@@ -47,3 +47,28 @@ body{
   .container{padding:0 12px}
   .controls{flex-direction:column;align-items:flex-start;gap:8px}
 }
+
+/* Back-to-top button */
+.to-top{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  display:inline-grid;
+  place-items:center;
+  background:var(--accent);
+  color:white;
+  box-shadow:0 6px 18px rgba(15,118,110,0.18);
+  border:0;
+  cursor:pointer;
+  transform:translateY(0);
+  transition:opacity .22s ease, transform .18s ease;
+  opacity:0;
+  z-index:1200;
+}
+.to-top.visible{opacity:1;transform:translateY(0)}
+.to-top:active{transform:translateY(1px)}
+.to-top svg{width:18px;height:18px;display:block}
+
