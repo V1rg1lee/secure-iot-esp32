@@ -75,9 +75,39 @@ async function loadLogs() {
 
                 const payload = document.createElement('pre');
                 payload.className = 'payload';
-                // Keep data short if very long
-                let dataText = obj.data;
-                try { dataText = JSON.stringify(obj.data); } catch {}
+                // Format payload: prefer human-friendly display for known keys
+                let dataText = '';
+                // If data is a JSON string, try to parse it
+                if (typeof obj.data === 'string') {
+                    try {
+                        obj.data = JSON.parse(obj.data);
+                    } catch (e) {
+                        // leave as string
+                    }
+                }
+
+                if (obj.data && typeof obj.data === 'object') {
+                    // Pretty format known sensor payloads and keep labels
+                    const parts = [];
+                    if (obj.data.temperature !== undefined) {
+                        parts.push(`Temperature: ${obj.data.temperature} °C`);
+                    }
+                    if (obj.data.humidity !== undefined) {
+                        parts.push(`Humidity: ${obj.data.humidity} %`);
+                    }
+                    if (parts.length > 0) {
+                        dataText = parts.join('\n');
+                    } else {
+                        try {
+                            dataText = JSON.stringify(obj.data, null, 2);
+                        } catch (e) {
+                            dataText = String(obj.data);
+                        }
+                    }
+                } else {
+                    dataText = String(obj.data ?? '');
+                }
+
                 if (dataText.length > 600) dataText = dataText.slice(0,600) + '…';
                 payload.textContent = dataText;
 
