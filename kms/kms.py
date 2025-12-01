@@ -2,7 +2,10 @@
 import os
 import json
 import hmac
+import time
 from typing import Dict, Tuple
+from webserver_utils import publish_event
+
 
 from crypto_utils import (
     hkdf,
@@ -18,7 +21,6 @@ class KMS:
     Key Management Service that communicates via a real MQTT broker (paho-mqtt).
     We assume mqtt_client is a connected paho.mqtt.client.Client.
     """
-
     def __init__(
         self,
         mqtt_client,
@@ -40,6 +42,8 @@ class KMS:
         # Example: iot/esp32/client_1/kms/auth
         self.mqtt.on_message = self._on_message
         self.mqtt.subscribe(f"{self.base_topic}/+/kms/#")
+        self.mqtt.subscribe(f"{self.base_topic}/data")
+        self.mqtt.subscribe(f"{self.base_topic}/data/#")
 
     def derive_client_master_key(self, client_id: str) -> bytes:
         return hkdf(self.kms_master_key, info=client_id.encode(), length=32)
@@ -55,6 +59,30 @@ class KMS:
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
         payload = msg.payload
+
+        #handle data topics (not KMS)
+        if topic == f"{self.base_topic}/data" and "counter" in payload.decode():
+            #decode json payload
+            payload = json.loads(payload.decode())
+
+            #Retrieve useful informations
+            iv = bytes.fromhex(payload["iv"])
+            ciphertext = bytes.fromhex(payload["ciphertext"])
+            tag = bytes.fromhex(payload["tag"])
+            aad_data = payload["counter"].to_bytes(4, "big") + payload["topic_name"].encode()
+            topic_key = self.topic_keys.get(payload["topic_name"])
+
+            #Derive the decryption aes-key and decrypt
+            aes_key = hkdf(topic_key, salt=iv + payload["counter"].to_bytes(4, "big"), info=payload["topic_name"].encode(), length=32)
+            plaintext = aes_gcm_decrypt(aes_key, iv, ciphertext, tag, aad=aad_data)
+            event = {
+                "type": "data_received",
+                "topic_name": payload["topic_name"],
+                "timestamp": time.time(),
+                "data": plaintext.decode(),
+                "client_id": payload["sender_id"]
+            }
+            publish_event(event)
 
         # Only handle KMS topics
         if "/kms/" not in topic:

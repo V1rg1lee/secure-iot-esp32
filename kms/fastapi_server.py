@@ -2,20 +2,18 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from kms_event_bus import clear_kms_log
+from webserver_utils import clear_kms_log
 
 LOG_FILE = "kms.log"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ------------ DÉMARRAGE ------------
-    clear_kms_log()  # <-- vidage automatique
-    print("🚀 FastAPI démarré, kms.log vidé.")
+    clear_kms_log()  # <-- automatic clearing
+    print("🚀 FastAPI started, kms.log cleared.")
 
     yield
 
-    # ------------ ARRÊT ------------
-    print("🛑 FastAPI s'arrête...")
+    print("🛑 FastAPI stopping...")
 
 app = FastAPI(lifespan=lifespan)
 
