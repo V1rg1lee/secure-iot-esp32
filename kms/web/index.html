@@ -11,7 +11,7 @@
 <header class="site-header">
     <div class="container">
         <h1>KMS — Logs</h1>
-        <p class="lead">Encrypted MQTT event stream for ESP32 nodes.</p>
+        <p class="lead">MQTT event stream for ESP32 nodes.</p>
     </div>
 </header>
 
@@ -21,7 +21,18 @@
         <button id="btn-refresh" class="btn small">Refresh</button>
     </div>
 
-    <section id="logs" class="logs" aria-live="polite">Loading…</section>
+        <section class="charts">
+            <div class="chart-card">
+                <div class="chart-header">Temperature <span id="valTemp" class="chart-value">—</span></div>
+                <canvas id="chartTemp" aria-label="Temperature chart" role="img"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">Humidity <span id="valHum" class="chart-value">—</span></div>
+                <canvas id="chartHum" aria-label="Humidity chart" role="img"></canvas>
+            </div>
+        </section>
+
+        <section id="logs" class="logs" aria-live="polite">Loading…</section>
 </main>
 <!-- Back to top button -->
 <button id="toTop" class="to-top" aria-label="Remonter en haut" title="Remonter en haut">
@@ -30,6 +41,8 @@
     </svg>
 </button>
 
+<!-- Chart.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="/static/app.js" defer></script>
 </body>
 </html>
