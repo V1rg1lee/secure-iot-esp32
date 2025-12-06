@@ -62,7 +62,7 @@
       parsed.sort((a, b) => (a.__tsMs || 0) - (b.__tsMs || 0));
 
       if (lines.length === 0) {
-        logDiv.innerHTML = '<div class="empty">Aucun événement récent.</div>';
+        logDiv.innerHTML = '<div class="empty">No recent events.</div>';
         lastSpan.textContent = new Date().toLocaleTimeString();
         return;
       }
@@ -167,7 +167,7 @@
       lastSpan.textContent = new Date().toLocaleTimeString();
     } catch (err) {
       console.error("Erreur fetch:", err);
-      logDiv.innerHTML = '<div class="empty">Erreur de chargement.</div>';
+      logDiv.innerHTML = '<div class="empty">Loading Error.</div>';
       lastSpan.textContent = "—";
     }
   }

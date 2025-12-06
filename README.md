@@ -24,6 +24,7 @@ uv --version
 ```
 
 ### 1.2. Mosquitto Broker
+
 - Install Mosquitto broker
 
 Verify:
@@ -52,6 +53,7 @@ uv pip install -r requirements.txt
 In another terminal, launch the Mosquitto broker:
 
 ### On Linux
+
 ```bash
 sudo mosquitto -c /etc/mosquitto/mosquitto.conf -v
 ```
@@ -114,15 +116,23 @@ In the uv environment, launch the kms server in the `kms` folder:
 uv run -m kms_server
 ```
 
-## 6. Flash the ESP32 firmware
+## 6.Launch the FastAPI server
+
+```bash
+uvicorn fastapi_server:app --reload --port 8000
+```
+
+NB: Make sure you are in the kms folder and that your environment is activate
+
+## 7. Flash the ESP32 firmware
 
 With the Arduino IDE, flash the firmware located in the `firmware` folder to each ESP32.
 
-## 7. (if needed) Reset each ESP32 configuration
+## 8. (if needed) Reset each ESP32 configuration
 
 Press and hold the button on each ESP32 for 5 seconds to reset the configuration. The reset is confirmed by the OLED display and the white led turning on after 5 seconds. After reset, the ESP32 will reboot and start the configuration process again.
 
-## 8. Set values for each ESP32
+## 9. Set values for each ESP32
 
 Now that you have reset each ESP32, you need to give them data to connect to the WiFi, the IP address of the Mosquitto broker,... For that you have two options:
 
