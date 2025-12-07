@@ -69,7 +69,7 @@ void oledShowTempHum(float temp, float hum, bool ok) {
     display.print(hum, 1);
     display.println(F(" %"));
   } else {
-    display.println(F("Lecture invalide"));
+    display.println(F("Invalid reading"));
   }
 
   display.display();
@@ -83,7 +83,7 @@ void oledShowTempHumText(const char* tempStr, const char* humStr, bool ok) {
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
-  display.println(F("Capteur DHT11"));
+  display.println(F("DHT11 Sensor"));
 
   display.setCursor(0, 16);
   if (ok) {
@@ -95,7 +95,7 @@ void oledShowTempHumText(const char* tempStr, const char* humStr, bool ok) {
     display.print(humStr);
     display.println(F(" %"));
   } else {
-    display.println(F("Lecture invalide"));
+    display.println(F("Invalid reading"));
   }
 
   display.display();
@@ -109,7 +109,7 @@ void oledShowTempHumWithSOS(const char* tempStr, const char* humStr, bool ok, bo
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
-  display.println(F("Capteur DHT11"));
+  display.println(F("DHT11 Sensor"));
 
   display.setCursor(0, 16);
   if (ok) {
@@ -121,7 +121,7 @@ void oledShowTempHumWithSOS(const char* tempStr, const char* humStr, bool ok, bo
     display.print(humStr);
     display.println(F(" %"));
   } else {
-    display.println(F("Lecture invalide"));
+    display.println(F("Invalid reading"));
   }
 
   // Display SOS status at bottom
