@@ -42,6 +42,8 @@ extern PubSubClient client;
 extern const char* mqttClientId;
 extern const char* topic_cmd_sub;
 extern const char* topic_data_sub;
+extern unsigned long g_remoteSosTime;
+extern bool g_remoteHasSOS;
 
 void messageReceived(char* topic, byte* payload, unsigned int length) {
 
@@ -77,6 +79,18 @@ void messageReceived(char* topic, byte* payload, unsigned int length) {
       g_remoteTemperatureLastMs = millis();
       parsed = true;
     }
+    
+    // Check for SOS flag in the payload
+    if (parseLen < 200) {
+      char buffer[256];
+      memcpy(buffer, parsePayload, parseLen);
+      buffer[parseLen] = '\0';
+      if (strstr(buffer, "\"sos\"") && strstr(buffer, ":1")) {
+        g_remoteHasSOS = true;
+        g_remoteSosTime = millis();
+        Serial.println("[SOS] Remote SOS received!");
+      }
+    }
   }
 
 
@@ -106,14 +120,14 @@ void messageReceived(char* topic, byte* payload, unsigned int length) {
 }
 
 extern PubSubClient client;
-extern void handleResetButton();
+extern void handleButtonInput();
 
 void reconnectMQTT(PubSubClient& client,
                    const char* clientId,
                    const char* commandTopicSub,
                    const char* dataTopicSub) {
   while (!client.connected()) {
-    handleResetButton();
+    handleButtonInput();
 
     if (client.connect(clientId)) {
       client.subscribe(commandTopicSub);
@@ -132,7 +146,7 @@ void reconnectMQTT(PubSubClient& client,
 
       unsigned long start = millis();
       while (millis() - start < 5000) {
-        handleResetButton();
+        handleButtonInput();
         delay(100);
       }
     }

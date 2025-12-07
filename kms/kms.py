@@ -92,8 +92,13 @@ class KMS:
                 
                 try:
                     plaintext = aes_gcm_decrypt(aes_key, iv, ciphertext, tag, aad=aad_data)
+                    
+                    # Parse plaintext to check for SOS flag
+                    data_obj = json.loads(plaintext.decode())
+                    is_sos = data_obj.get("sos") == 1
+                    
                     event = {
-                        "type": "data_received",
+                        "type": "sos_alert" if is_sos else "data_received",
                         "topic_name": topic_name,
                         "timestamp": time.time(),
                         "data": plaintext.decode(),
@@ -101,6 +106,10 @@ class KMS:
                         "epoch": epoch
                     }
                     publish_event(event)
+                    
+                    if is_sos:
+                        print(f"[KMS] SOS ALERT from {sender_id}!")
+                    
                 except Exception as decrypt_err:
                     print(f"[KMS] Decrypt failed for message from {sender_id}:")
                     print(f"  - Topic: {topic_name}")

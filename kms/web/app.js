@@ -4,6 +4,55 @@
 (function () {
   "use strict";
 
+  // SOS state management
+  const sosAlerts = new Map(); // Map<client_id, {timestamp, cleared}>
+  const SOS_DISPLAY_TIME = 20000; // 20 seconds in ms
+
+  function updateSOSDisplay() {
+    const now = Date.now();
+    const sosContainer = document.getElementById("sos-alerts");
+    const sosList = document.getElementById("sos-list");
+    
+    if (!sosContainer || !sosList) return;
+
+    // Remove expired alerts
+    for (const [client_id, alert] of sosAlerts.entries()) {
+      if (now - alert.timestamp > SOS_DISPLAY_TIME) {
+        sosAlerts.delete(client_id);
+      }
+    }
+
+    // Update display
+    if (sosAlerts.size === 0) {
+      sosContainer.style.display = "none";
+      return;
+    }
+
+    sosContainer.style.display = "block";
+    sosList.innerHTML = "";
+
+    for (const [client_id, alert] of sosAlerts.entries()) {
+      const item = document.createElement("div");
+      item.className = "sos-item";
+      
+      const text = document.createElement("div");
+      text.className = "sos-item-text";
+      
+      const client = document.createElement("span");
+      client.className = "sos-item-client";
+      client.textContent = client_id || "Unknown";
+      
+      const time = document.createElement("span");
+      time.className = "sos-item-time";
+      time.textContent = formatTime(alert.timestamp);
+      
+      text.appendChild(client);
+      text.appendChild(time);
+      item.appendChild(text);
+      sosList.appendChild(item);
+    }
+  }
+
   function renderLogs() {
     const logDiv = document.getElementById("logs");
     const showMoreBtn = document.getElementById("btn-show-more");
@@ -183,10 +232,21 @@
         try {
           const obj = JSON.parse(line);
           allLogs.push(obj);
+          
+          // Track SOS alerts
+          if (obj.type === "sos_alert") {
+            sosAlerts.set(obj.client_id, {
+              timestamp: getTimestampMs(obj.timestamp),
+              cleared: false
+            });
+          }
         } catch (e) {
           console.warn("Ignored invalid JSON line:", e, line);
         }
       }
+
+      // Update SOS display
+      updateSOSDisplay();
 
       // Render logs in reverse order (newest first) with pagination
       renderLogs();
@@ -346,6 +406,10 @@
 
     // reload every second
     setInterval(loadLogs, 1000);
+    
+    // Update SOS display every 500ms to handle expiration smoothly
+    setInterval(updateSOSDisplay, 500);
+    
     loadLogs();
 
     setupBackToTop();

@@ -1,6 +1,6 @@
 #include "local_network.h"
 
-extern void handleResetButton();
+extern void handleButtonInput();
 
 void setupWiFi(const char* ssid, const char* password) {
   Serial.print("Connecting to WiFi: ");
@@ -14,7 +14,7 @@ void setupWiFi(const char* ssid, const char* password) {
          (millis() - start) < timeoutMs) {
 
     Serial.print(".");
-    handleResetButton();
+    handleButtonInput();
     delay(200);
   }
 

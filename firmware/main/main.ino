@@ -41,6 +41,20 @@ const unsigned long dhtEveryMs = 2000; // ms
 // If no data from the other ESP for this many milliseconds, treat as stale
 const unsigned long REMOTE_TIMEOUT_MS = 10000; // 10 seconds
 
+// SOS (triple-click) detection
+const unsigned long SOS_CLICK_INTERVAL = 1500; // ms to detect triple-click
+const unsigned long SOS_DISPLAY_TIME = 20000; // ms to display SOS on remote
+const unsigned long SOS_BLINK_INTERVAL = 300; // ms blink rate for LED
+struct SOSState {
+  unsigned long lastClickTime = 0;
+  int clickCount = 0;
+  bool isActive = false;
+  unsigned long activeSince = 0;
+} g_sosState;
+
+unsigned long g_remoteSosTime = 0; // When we last received a SOS (timestamp)
+bool g_remoteHasSOS = false; // Whether remote is currently sending SOS
+
 // Wifi config
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -55,31 +69,80 @@ const char* topic_data_sub = "iot/esp32/data";
 const char* topic_cmd_sub = "iot/esp32/commands";
 
 static unsigned long resetPressStart = 0;
+static int lastButtonReading_local = LOW;
 
-void handleResetButton() {
+void handleButtonInput() {
   int rawBtn = digitalRead(BTN_PIN);
+  unsigned long now = millis();
+
+  // Detect button press (transition from LOW to HIGH)
+  if (rawBtn == HIGH && lastButtonReading_local == LOW) {
+    // Button just pressed
+    if (resetPressStart == 0) {
+      resetPressStart = now;
+    }
+    
+    // Check for triple-click SOS pattern
+    if (now - g_sosState.lastClickTime < SOS_CLICK_INTERVAL) {
+      g_sosState.clickCount++;
+    } else {
+      g_sosState.clickCount = 1; // Reset counter if too much time passed
+    }
+    g_sosState.lastClickTime = now;
+    
+    // Triple-click detected: send SOS
+    if (g_sosState.clickCount >= 3) {
+      g_sosState.clickCount = 0;
+      g_sosState.isActive = true;
+      g_sosState.activeSince = now;
+      Serial.println("[SOS] Triple-click detected! Sending SOS...");
+    }
+  }
 
   if (rawBtn == HIGH) {
-    if (resetPressStart == 0) {
-      resetPressStart = millis();
-    }
-
     setLED(true);
-
-    unsigned long held = millis() - resetPressStart;
-    if (held > 5000) { // > 5s -> trigger reset
+    unsigned long held = now - resetPressStart;
+    
+    // Reset takes priority if held for 5+ seconds
+    if (held > 5000) {
       setResetLED(true);
       oledShowMessage("Reset config", "Reboot...");
       delay(300);
       setResetLED(false);
       setLED(false);
-
       clearConfig();
     }
   } else {
+    // Button released
     resetPressStart = 0;
     setLED(false);
     setResetLED(false);
+  }
+  
+  lastButtonReading_local = rawBtn;
+}
+
+void handleSOSDisplay() {
+  unsigned long now = millis();
+  
+  // Check if our local SOS is still active
+  if (g_sosState.isActive) {
+    if (now - g_sosState.activeSince > SOS_DISPLAY_TIME) {
+      g_sosState.isActive = false;
+    }
+  }
+  
+  // Check if remote SOS is still active
+  if (g_remoteHasSOS) {
+    if (now - g_remoteSosTime > SOS_DISPLAY_TIME) {
+      g_remoteHasSOS = false;
+    }
+  }
+  
+  // Blink LED if any SOS is active
+  if (g_sosState.isActive || g_remoteHasSOS) {
+    bool shouldBeLit = ((now / SOS_BLINK_INTERVAL) % 2) == 0;
+    setLED(shouldBeLit);
   }
 }
 
@@ -294,7 +357,8 @@ void loop() {
 
   client.loop(); // IMPORTANT to process MQTT messages
 
-  handleResetButton();
+  handleButtonInput();
+  handleSOSDisplay();
 
   unsigned long now = millis();
   if (now - lastDht >= dhtEveryMs) {
@@ -324,6 +388,17 @@ void loop() {
       } else {
         Serial.println("TOPIC_key not ready, skipping secure publish");
       }
+    }
+    
+    // Handle SOS transmission - send on iot/esp32/data topic with sos flag
+    if (g_sosState.isActive && secureMqttIsReady()) {
+      char sosPayload[32];
+      snprintf(sosPayload, sizeof(sosPayload), "{\"sos\":1}");
+      secureMqttEncryptAndPublish(client,
+                                  topic_pub,
+                                  (const uint8_t*)sosPayload,
+                                  strlen(sosPayload));
+      Serial.println("[SOS] SOS message sent!");
     } else {
       Serial.println("DHT -> invalid reading");
     }
@@ -373,6 +448,6 @@ void loop() {
     bool displayOk = (IS_TEMPERATURE_NODE ? th.ok : remoteTemperatureFresh) ||
              (!IS_TEMPERATURE_NODE ? th.ok : remoteHumidityFresh);
 
-    oledShowTempHumText(tempStr, humStr, displayOk);
+    oledShowTempHumWithSOS(tempStr, humStr, displayOk, g_sosState.isActive, g_remoteHasSOS);
   }
 }
