@@ -35,6 +35,8 @@ body{
 .logs{display:block;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.9));border-radius:12px;padding:12px;box-shadow:var(--shadow);min-height:300px;overflow:auto}
 .log-item{display:flex;gap:12px;padding:10px;border-radius:8px;background:var(--card);margin-bottom:10px;align-items:flex-start;border:1px solid rgba(15,23,42,0.04)}
 .badge{font-size:12px;padding:6px 8px;border-radius:999px;background:#eef6f4;color:var(--accent);border:1px solid rgba(15,118,110,0.06)}
+.badge-temp{background:#eef6f4;color:#0f766e;border:1px solid rgba(15,118,110,0.12)}
+.badge-hum{background:#e0f2fe;color:#0e9fe5;border:1px solid rgba(14,159,229,0.12)}
 .meta-col{flex:0 0 auto}
 .content{flex:1}
 .content .title{font-weight:600;font-size:14px;margin:0 0 6px}
@@ -53,6 +55,8 @@ body{
 .chart-card{background:var(--card);padding:12px;border-radius:10px;box-shadow:var(--shadow);border:1px solid rgba(15,23,42,0.04)}
 .chart-header{font-weight:600;margin-bottom:8px}
 .chart-value{float:right;font-weight:700;color:var(--accent)}
+.chart-value.temp{color:#0f766e}
+.chart-value.hum{color:#0e9fe5}
 .chart-card canvas{width:100% !important;height:220px !important}
 
 @media (max-width:760px){
@@ -83,4 +87,31 @@ body{
 .to-top.visible{opacity:1;transform:translateY(0)}
 .to-top:active{transform:translateY(1px)}
 .to-top svg{width:18px;height:18px;display:block}
+
+/* Pagination controls */
+.pagination-controls{
+  text-align:center;
+  margin:18px 0;
+  padding:12px
+}
+.btn.show-more{
+  background:var(--accent);
+  color:white;
+  border:0;
+  padding:10px 24px;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+  font-size:14px;
+  font-weight:500;
+  transition:all 0.2s ease
+}
+.btn.show-more:hover{
+  background:#0d6760;
+  transform:translateY(-1px);
+  box-shadow:0 8px 24px rgba(15,118,110,0.2)
+}
+.btn.show-more:active{
+  transform:translateY(0)
+}
 

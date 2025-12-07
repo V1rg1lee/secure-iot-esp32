@@ -18,21 +18,23 @@
 <main class="container main">
     <div class="controls">
         <div class="meta">Last updated: <span id="last">—</span></div>
-        <button id="btn-refresh" class="btn small">Refresh</button>
     </div>
 
         <section class="charts">
             <div class="chart-card">
-                <div class="chart-header">Temperature <span id="valTemp" class="chart-value">—</span></div>
+                <div class="chart-header">Temperature <span id="valTemp" class="chart-value temp">—</span></div>
                 <canvas id="chartTemp" aria-label="Temperature chart" role="img"></canvas>
             </div>
             <div class="chart-card">
-                <div class="chart-header">Humidity <span id="valHum" class="chart-value">—</span></div>
+                <div class="chart-header">Humidity <span id="valHum" class="chart-value hum">—</span></div>
                 <canvas id="chartHum" aria-label="Humidity chart" role="img"></canvas>
             </div>
         </section>
 
         <section id="logs" class="logs" aria-live="polite">Loading…</section>
+        <div class="pagination-controls">
+            <button id="btn-show-more" class="btn show-more" style="display:none;">Show More</button>
+        </div>
 </main>
 <!-- Back to top button -->
 <button id="toTop" class="to-top" aria-label="Back to top" title="Back to top">

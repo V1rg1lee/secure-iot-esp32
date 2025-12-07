@@ -4,6 +4,108 @@
 (function () {
   "use strict";
 
+  function renderLogs() {
+    const logDiv = document.getElementById("logs");
+    const showMoreBtn = document.getElementById("btn-show-more");
+    
+    if (!logDiv) return;
+    
+    logDiv.innerHTML = "";
+    
+    if (allLogs.length === 0) {
+      logDiv.innerHTML = '<div class="empty">No recent events.</div>';
+      if (showMoreBtn) showMoreBtn.style.display = "none";
+      return;
+    }
+    
+    // Reverse order: newest first
+    const logsToShow = allLogs.slice().reverse().slice(0, displayedCount);
+    
+    for (const obj of logsToShow) {
+      const item = document.createElement("article");
+      item.className = "log-item";
+
+      const metaCol = document.createElement("div");
+      metaCol.className = "meta-col";
+      const timeBadge = document.createElement("div");
+      timeBadge.className = "badge";
+      timeBadge.textContent = formatTime(obj.timestamp);
+      
+      // Determine badge color based on data content
+      if (typeof obj.data === "string") {
+        try {
+          obj.data = JSON.parse(obj.data);
+        } catch (e) {
+        }
+      }
+      if (obj.data && typeof obj.data === "object") {
+        if (obj.data.temperature !== undefined) {
+          timeBadge.className = "badge badge-temp";
+        } else if (obj.data.humidity !== undefined) {
+          timeBadge.className = "badge badge-hum";
+        }
+      }
+      
+      metaCol.appendChild(timeBadge);
+
+      const content = document.createElement("div");
+      content.className = "content";
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = obj.client_id || "unknown client";
+      const topic = document.createElement("div");
+      topic.className = "topic";
+      topic.textContent =
+        obj.topic_name +
+        (obj.epoch !== undefined ? ` — epoch ${obj.epoch}` : "");
+
+      const payload = document.createElement("pre");
+      payload.className = "payload";
+
+      // Format payload for display
+      let dataText = "";
+      if (obj.data && typeof obj.data === "object") {
+        const parts = [];
+        if (obj.data.temperature !== undefined)
+          parts.push(`Temperature: ${obj.data.temperature} °C`);
+        if (obj.data.humidity !== undefined)
+          parts.push(`Humidity: ${obj.data.humidity} %`);
+        if (parts.length > 0) dataText = parts.join("\n");
+        else {
+          try {
+            dataText = JSON.stringify(obj.data, null, 2);
+          } catch (e) {
+            dataText = String(obj.data);
+          }
+        }
+      } else {
+        dataText = String(obj.data ?? "");
+      }
+
+      if (dataText.length > 600) dataText = dataText.slice(0, 600) + "…";
+      payload.textContent = dataText;
+
+      content.appendChild(title);
+      content.appendChild(topic);
+      content.appendChild(payload);
+
+      item.appendChild(metaCol);
+      item.appendChild(content);
+
+      logDiv.appendChild(item);
+    }
+    
+    // Show/hide "Show More" button
+    if (showMoreBtn) {
+      if (displayedCount < allLogs.length) {
+        showMoreBtn.style.display = "block";
+        showMoreBtn.textContent = `Show More (${allLogs.length - displayedCount} remaining)`;
+      } else {
+        showMoreBtn.style.display = "none";
+      }
+    }
+  }
+
   function formatTime(ts) {
     try {
       // If timestamp is a numeric string, convert to number
@@ -31,6 +133,11 @@
   const maxPoints = 30;
   let lastChartTimestamp = 0;
 
+  // Pagination state
+  let allLogs = []; // Store all parsed logs
+  let displayedCount = 20; // Number of logs currently displayed
+  const logsPerPage = 20; // Number of logs to add when "Show More" is clicked
+
   async function loadLogs() {
     const logDiv = document.getElementById("logs");
     const lastSpan = document.getElementById("last");
@@ -41,6 +148,10 @@
       logDiv.innerHTML = ""; // reset
 
       const lines = text.split("\n").filter((l) => l.trim().length > 0);
+      
+      // Store all logs for pagination
+      allLogs = [];
+      
       // parse lines into objects for charting (chronological)
       const parsed = [];
       for (const line of lines) {
@@ -67,77 +178,18 @@
         return;
       }
 
-      // Render logs in original order
+      // Store all logs parsed for pagination
       for (const line of lines) {
         try {
           const obj = JSON.parse(line);
-
-          const item = document.createElement("article");
-          item.className = "log-item";
-
-          const metaCol = document.createElement("div");
-          metaCol.className = "meta-col";
-          const timeBadge = document.createElement("div");
-          timeBadge.className = "badge";
-          timeBadge.textContent = formatTime(obj.timestamp);
-          metaCol.appendChild(timeBadge);
-
-          const content = document.createElement("div");
-          content.className = "content";
-          const title = document.createElement("div");
-          title.className = "title";
-          title.textContent = obj.client_id || "unknown client";
-          const topic = document.createElement("div");
-          topic.className = "topic";
-          topic.textContent =
-            obj.topic_name +
-            (obj.epoch !== undefined ? ` — epoch ${obj.epoch}` : "");
-
-          const payload = document.createElement("pre");
-          payload.className = "payload";
-
-          // Format payload for display
-          let dataText = "";
-          if (typeof obj.data === "string") {
-            try {
-              obj.data = JSON.parse(obj.data);
-            } catch (e) {
-              /* leave string */
-            }
-          }
-          if (obj.data && typeof obj.data === "object") {
-            const parts = [];
-            if (obj.data.temperature !== undefined)
-              parts.push(`Temperature: ${obj.data.temperature} °C`);
-            if (obj.data.humidity !== undefined)
-              parts.push(`Humidity: ${obj.data.humidity} %`);
-            if (parts.length > 0) dataText = parts.join("\n");
-            else {
-              try {
-                dataText = JSON.stringify(obj.data, null, 2);
-              } catch (e) {
-                dataText = String(obj.data);
-              }
-            }
-          } else {
-            dataText = String(obj.data ?? "");
-          }
-
-          if (dataText.length > 600) dataText = dataText.slice(0, 600) + "…";
-          payload.textContent = dataText;
-
-          content.appendChild(title);
-          content.appendChild(topic);
-          content.appendChild(payload);
-
-          item.appendChild(metaCol);
-          item.appendChild(content);
-
-          logDiv.appendChild(item);
+          allLogs.push(obj);
         } catch (e) {
           console.warn("Ignored invalid JSON line:", e, line);
         }
       }
+
+      // Render logs in reverse order (newest first) with pagination
+      renderLogs();
 
       // Update charts using parsed chronological items (avoid duplicates)
       for (const obj of parsed) {
@@ -184,9 +236,11 @@
   }
 
   function createBarChart(ctx, label, color) {
+    // Create a subtle gradient that stays opaque
     const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
     gradient.addColorStop(0, color);
-    gradient.addColorStop(1, "rgba(255,255,255,0.06)");
+    // Slightly lighter but still opaque
+    gradient.addColorStop(1, color.replace(/[\d.]+\)$/, '0.75)'));
 
     return new Chart(ctx, {
       type: "bar",
@@ -197,6 +251,8 @@
             label: label,
             data: [],
             backgroundColor: gradient,
+            borderColor: color,
+            borderWidth: 2,
             borderRadius: 6,
           },
         ],
@@ -261,8 +317,14 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    const refreshBtn = document.getElementById("btn-refresh");
-    if (refreshBtn) refreshBtn.addEventListener("click", loadLogs);
+    // Setup show more button
+    const showMoreBtn = document.getElementById("btn-show-more");
+    if (showMoreBtn) {
+      showMoreBtn.addEventListener("click", function() {
+        displayedCount += logsPerPage;
+        renderLogs();
+      });
+    }
 
     // initialize charts
     try {

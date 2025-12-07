@@ -61,28 +61,58 @@ class KMS:
         payload = msg.payload
 
         #handle data topics (not KMS)
-        if topic == f"{self.base_topic}/data" and "counter" in payload.decode():
-            #decode json payload
-            payload = json.loads(payload.decode())
+        if topic == f"{self.base_topic}/data":
+            try:
+                payload_str = payload.decode()
+                if "counter" not in payload_str:
+                    return
+                    
+                #decode json payload
+                payload_data = json.loads(payload_str)
 
-            #Retrieve useful informations
-            iv = bytes.fromhex(payload["iv"])
-            ciphertext = bytes.fromhex(payload["ciphertext"])
-            tag = bytes.fromhex(payload["tag"])
-            aad_data = payload["counter"].to_bytes(4, "big") + payload["topic_name"].encode()
-            topic_key = self.topic_keys.get(payload["topic_name"])
+                #Retrieve useful informations
+                iv = bytes.fromhex(payload_data["iv"])
+                ciphertext = bytes.fromhex(payload_data["ciphertext"])
+                tag = bytes.fromhex(payload_data["tag"])
+                counter = payload_data["counter"]
+                topic_name = payload_data["topic_name"]
+                sender_id = payload_data.get("sender_id", "unknown")
+                epoch = payload_data.get("epoch", 0)
+                
+                aad_data = counter.to_bytes(4, "big") + topic_name.encode()
+                topic_key = self.topic_keys.get(topic_name)
+                
+                if not topic_key:
+                    print(f"[KMS] Warning: No TOPIC_key found for {topic_name}, skipping decrypt")
+                    return
 
-            #Derive the decryption aes-key and decrypt
-            aes_key = hkdf(topic_key, salt=iv + payload["counter"].to_bytes(4, "big"), info=payload["topic_name"].encode(), length=32)
-            plaintext = aes_gcm_decrypt(aes_key, iv, ciphertext, tag, aad=aad_data)
-            event = {
-                "type": "data_received",
-                "topic_name": payload["topic_name"],
-                "timestamp": time.time(),
-                "data": plaintext.decode(),
-                "client_id": payload["sender_id"]
-            }
-            publish_event(event)
+                #Derive the decryption aes-key and decrypt
+                salt = iv + counter.to_bytes(4, "big")
+                aes_key = hkdf(topic_key, salt=salt, info=topic_name.encode(), length=32)
+                
+                try:
+                    plaintext = aes_gcm_decrypt(aes_key, iv, ciphertext, tag, aad=aad_data)
+                    event = {
+                        "type": "data_received",
+                        "topic_name": topic_name,
+                        "timestamp": time.time(),
+                        "data": plaintext.decode(),
+                        "client_id": sender_id,
+                        "epoch": epoch
+                    }
+                    publish_event(event)
+                except Exception as decrypt_err:
+                    print(f"[KMS] Decrypt failed for message from {sender_id}:")
+                    print(f"  - Topic: {topic_name}")
+                    print(f"  - Counter: {counter}")
+                    print(f"  - Epoch: {epoch}")
+                    print(f"  - Error: {decrypt_err}")
+                    print(f"  - Possible cause: Client using wrong/old TOPIC_key or epoch mismatch")
+                    
+            except json.JSONDecodeError as e:
+                print(f"[KMS] JSON decode error on data topic: {e}")
+            except Exception as e:
+                print(f"[KMS] Error processing data message: {e}")
 
         # Only handle KMS topics
         if "/kms/" not in topic:
