@@ -107,10 +107,10 @@ static void deriveTopicKeys(const char* topic,
                             uint8_t* topicAuthKey,
                             uint8_t* topicEncKey) {
   uint8_t material[64];
-  const uint8_t salt[1] = {0};
+  // Use topic name as salt for deterministic but unique derivation per topic
   sc_hkdf_sha256(CLIENT_MASTER_KEY, sizeof(CLIENT_MASTER_KEY),
-                 salt, sizeof(salt),
                  (const uint8_t*)topic, strlen(topic),
+                 (const uint8_t*)"TOPIC_KEYS", strlen("TOPIC_KEYS"),
                  material, sizeof(material));
   memcpy(topicAuthKey, material, 32);
   memcpy(topicEncKey, material + 32, 32);

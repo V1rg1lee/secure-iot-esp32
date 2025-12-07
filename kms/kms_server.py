@@ -201,11 +201,12 @@ def main():
     kms = KMS(mqtt_kms, kms_priv, kms_pub, kms_master_key, BASE_TOPIC)
 
     # 4) Derive the CLIENT_MASTER_KEY for the two ESP32
+    # Use client_id as salt for deterministic but unique derivation
     client_master_key_temp = hkdf(
-        kms_master_key, info=ESP_CLIENT_ID_TEMP.encode(), length=32
+        kms_master_key, salt=ESP_CLIENT_ID_TEMP.encode(), info=b"CLIENT_MASTER_KEY", length=32
     )
     client_master_key_hum = hkdf(
-        kms_master_key, info=ESP_CLIENT_ID_HUM.encode(), length=32
+        kms_master_key, salt=ESP_CLIENT_ID_HUM.encode(), info=b"CLIENT_MASTER_KEY", length=32
     )
 
     print("=== KMS SERVER STARTED ===")

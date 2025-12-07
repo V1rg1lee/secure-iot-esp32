@@ -46,10 +46,12 @@ class KMS:
         self.mqtt.subscribe(f"{self.base_topic}/data/#")
 
     def derive_client_master_key(self, client_id: str) -> bytes:
-        return hkdf(self.kms_master_key, info=client_id.encode(), length=32)
+        # Use client_id as salt for deterministic but unique derivation per client
+        return hkdf(self.kms_master_key, salt=client_id.encode(), info=b"CLIENT_MASTER_KEY", length=32)
 
     def derive_topic_keys_material(self, client_master_key: bytes, topic: str):
-        material = hkdf(client_master_key, info=topic.encode(), length=64)
+        # Use topic name as salt for deterministic but unique derivation per topic
+        material = hkdf(client_master_key, salt=topic.encode(), info=b"TOPIC_KEYS", length=64)
         topic_auth_key = material[:32]
         topic_key_enc_key = material[32:]
         return topic_auth_key, topic_key_enc_key
