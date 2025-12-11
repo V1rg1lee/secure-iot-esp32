@@ -227,11 +227,17 @@
         return;
       }
 
-      // Store all logs parsed for pagination
+      // Store all logs parsed for pagination (max 200 events, FIFO)
+      const MAX_LOGS = 200;
       for (const line of lines) {
         try {
           const obj = JSON.parse(line);
           allLogs.push(obj);
+          
+          // Enforce max logs limit (FIFO - remove oldest)
+          if (allLogs.length > MAX_LOGS) {
+            allLogs.shift();
+          }
           
           // Track SOS alerts
           if (obj.type === "sos_alert") {
